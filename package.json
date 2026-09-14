@@ -1,0 +1,30 @@
+{
+  "name": "streetsetu",
+  "version": "1.0.0",
+  "private": true,
+  "description": "StreetSetu monorepo backend foundation and shared infrastructure scaffolding",
+  "main": "services/api/src/server.js",
+  "workspaces": [
+    "apps/*",
+    "services/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "start": "node services/api/src/server.js",
+    "dev": "node services/api/src/server.js",
+    "lint": "echo \"No lint configured yet\"",
+    "test": "echo \"No tests configured yet\""
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "joi": "^17.13.6",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.7.3",
+    "morgan": "^1.10.0",
+    "winston": "^3.17.0"
+  }
+}

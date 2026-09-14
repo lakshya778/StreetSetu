@@ -1,0 +1,11 @@
+{
+  "name": "@streetsetu/api",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "jest --runInBand",
+    "dev": "node dist/server.js"
+  }
+}

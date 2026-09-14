@@ -1,0 +1,11 @@
+{
+  "name": "@streetsetu/web",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "dev": "vite"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "strict": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@streetsetu/types": ["packages/types/src"],
+      "@streetsetu/utils": ["packages/utils/src"],
+      "@streetsetu/config": ["packages/config/src"],
+      "@streetsetu/validation": ["packages/validation/src"],
+      "@streetsetu/db": ["packages/db/src"],
+      "@streetsetu/shared-ui": ["packages/shared-ui/src"]
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "@streetsetu/types",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "jest --runInBand"
+  }
+}
