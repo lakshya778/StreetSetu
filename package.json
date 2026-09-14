@@ -2,18 +2,16 @@
   "name": "streetsetu",
   "version": "1.0.0",
   "private": true,
-  "description": "StreetSetu monorepo backend foundation and shared infrastructure scaffolding",
-  "main": "services/api/src/server.js",
-  "workspaces": [
-    "apps/*",
-    "services/*",
-    "packages/*"
-  ],
+  "description": "StreetSetu - AI-Powered Street & Neighbourhood Action Platform",
+  "main": "backend/src/server.js",
+  "type": "module",
   "scripts": {
-    "start": "node services/api/src/server.js",
-    "dev": "node services/api/src/server.js",
+    "start": "npm --prefix backend start",
+    "dev": "npm --prefix backend run dev",
+    "frontend": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
     "lint": "echo \"No lint configured yet\"",
-    "test": "echo \"No tests configured yet\""
+    "test": "npm --prefix backend run test"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -21,10 +19,9 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "helmet": "^8.0.0",
-    "joi": "^17.13.6",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.7.3",
-    "morgan": "^1.10.0",
-    "winston": "^3.17.0"
-  }
+    "morgan": "^1.10.0"
+  },
+  "workspaces": []
 }
