@@ -1,8 +1,8 @@
-# Street Neighbourhood Action Platform — PRD Analysis and Implementation Roadmap
+# StreetSetu — AI-Powered Street & Neighbourhood Action Platform — PRD Analysis and Implementation Roadmap
 
 ## 1. Executive Summary
 
-The Street Neighbourhood Action Platform is a civic technology product that turns local neighbourhood issues into structured citizen reports, ward-level action workflows, municipal oversight, and AI-assisted triage. The platform should connect citizens, neighbourhood volunteers, ward officers, local government administration, and data/analytics teams through a single operating model.
+StreetSetu — AI-Powered Street & Neighbourhood Action Platform is a civic technology product that turns local neighbourhood issues into structured citizen reports, ward-level action workflows, municipal oversight, and AI-assisted triage. The platform should connect citizens, neighbourhood volunteers, ward officers, local government administration, and data/analytics teams through a single operating model.
 
 The product should prioritize three outcomes:
 

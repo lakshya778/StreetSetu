@@ -75,7 +75,7 @@ Keep the monorepo modular. Do not combine frontend, backend, mobile, AI, worker,
 The repository must maintain a monorepo structure and preserve separation of concerns.
 
 ```text
-street-neighbourhood-action-platform/
+streetsetu/
 ├── apps/
 │   ├── web/
 │   └── mobile/

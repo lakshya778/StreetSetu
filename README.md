@@ -1,13 +1,13 @@
-# Street Neighbourhood Action Platform — Production Monorepo Architecture
+# StreetSetu — AI-Powered Street & Neighbourhood Action Platform
 
 ## Architecture Overview
 
-This repository implements a production-oriented monorepo for the Street Neighbourhood Action Platform. It separates concerns into independent packages while sharing domain contracts, validation rules, database schemas, and environment configuration.
+This repository implements a production-oriented monorepo for StreetSetu, the AI-Powered Street & Neighbourhood Action Platform. It separates concerns into independent packages while sharing domain contracts, validation rules, database schemas, and environment configuration.
 
 ## Monorepo Layout
 
 ```text
-street-neighbourhood-action-platform/
+streetsetu/
 ├── apps/
 │   ├── web/
 │   │   ├── src/
