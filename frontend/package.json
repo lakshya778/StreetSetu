@@ -11,14 +11,18 @@
   "dependencies": {
     "@vitejs/plugin-react": "latest",
     "axios": "latest",
+    "leaflet": "^1.9.4",
     "react": "latest",
     "react-dom": "latest",
+    "react-leaflet": "^5.0.0",
+    "react-leaflet-cluster": "^4.1.3",
     "react-router-dom": "latest"
   },
   "devDependencies": {
-    "vite": "latest",
-    "tailwindcss": "latest",
+    "@tailwindcss/postcss": "latest",
+    "autoprefixer": "latest",
     "postcss": "latest",
-    "autoprefixer": "latest"
+    "tailwindcss": "latest",
+    "vite": "latest"
   }
 }

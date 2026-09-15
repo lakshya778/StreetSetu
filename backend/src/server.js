@@ -4,6 +4,8 @@ import morgan from 'morgan';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
+import apiRoutes from './routes/index.js';
+import { errorHandler } from './middleware/errorHandler.js';
 
 dotenv.config();
 
@@ -14,10 +16,13 @@ app.use(cors({ origin: process.env.CLIENT_ORIGIN || '*' }));
 app.use(helmet());
 app.use(express.json());
 app.use(morgan('dev'));
+app.use('/api/v1', apiRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'StreetSetu API is healthy' });
 });
+
+app.use(errorHandler);
 
 mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/streetsetu')
   .then(() => {

@@ -11,13 +11,16 @@
   },
   "dependencies": {
     "bcryptjs": "latest",
+    "cloudinary": "latest",
     "cors": "latest",
     "dotenv": "latest",
     "express": "latest",
     "helmet": "latest",
     "jsonwebtoken": "latest",
     "mongoose": "latest",
-    "morgan": "latest"
+    "morgan": "latest",
+    "multer": "latest",
+    "nodemailer": "latest"
   },
   "devDependencies": {
     "nodemon": "latest"
