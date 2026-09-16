@@ -1,8 +1,21 @@
 import mongoose from 'mongoose';
 import Complaint from '../models/Complaint.js';
 
-const OPEN_STATUSES = ['submitted', 'under_review', 'assigned', 'in_progress'];
-const RESOLVED_STATUSES = ['resolved', 'closed'];
+const OPEN_STATUSES = [
+  'submitted',
+  'under_review',
+  'assigned',
+  'in_progress'
+];
+
+const RESOLVED_STATUSES = [
+  'resolved',
+  'closed'
+];
+
+const REJECTED_STATUSES = [
+  'rejected'
+];
 
 function buildMatch(query, req) {
   const match = {};
@@ -30,10 +43,21 @@ function calculateRate(resolved, total) {
 
 export async function getDashboardSummary(query, req) {
   const match = buildMatch(query, req);
-  const [totalComplaints, openComplaints, resolvedComplaints, categoryCounts, wardStatistics, volunteerGroups] = await Promise.all([
+  const [
+  totalComplaints,
+  openComplaints,
+  resolvedComplaints,
+  rejectedComplaints,
+  categoryCounts,
+  wardStatistics,
+  volunteerGroups
+] = await Promise.all([
     Complaint.countDocuments(match),
     Complaint.countDocuments({ ...match, status: { $in: OPEN_STATUSES } }),
     Complaint.countDocuments({ ...match, status: { $in: RESOLVED_STATUSES } }),
+    Complaint.countDocuments({...match,
+      status: { $in: REJECTED_STATUSES }
+      }),
     Complaint.aggregate([
       { $match: match },
       { $group: { _id: '$category', count: { $sum: 1 } } },
@@ -68,7 +92,8 @@ export async function getDashboardSummary(query, req) {
           _id: '$assignedTo',
           assignedComplaints: { $sum: 1 },
           openComplaints: countByStatus(OPEN_STATUSES),
-          resolvedComplaints: countByStatus(RESOLVED_STATUSES)
+          resolvedComplaints: countByStatus(RESOLVED_STATUSES),
+          rejectedComplaints: countByStatus(REJECTED_STATUSES)
         }
       },
       {
@@ -90,7 +115,8 @@ export async function getDashboardSummary(query, req) {
           volunteerRole: '$volunteer.role',
           assignedComplaints: 1,
           openComplaints: 1,
-          resolvedComplaints: 1
+          resolvedComplaints: 1,
+          rejectedComplaints: 1
         }
       }
     ])
@@ -102,13 +128,17 @@ export async function getDashboardSummary(query, req) {
   }));
   const volunteerPerformance = volunteerGroups.map((volunteer) => ({
     ...volunteer,
-    resolutionRate: calculateRate(volunteer.resolvedComplaints, volunteer.assignedComplaints)
+    resolutionRate: calculateRate(
+      volunteer.resolvedComplaints,
+      Math.max(volunteer.assignedComplaints - volunteer.rejectedComplaints, 0)
+    )
   }));
 
-  return {
+    return {
     totalComplaints,
     openComplaints,
     resolvedComplaints,
+    rejectedComplaints,
     categoryCounts,
     wardStatistics: wardStats,
     volunteerPerformance,

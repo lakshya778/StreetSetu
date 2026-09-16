@@ -1,5 +1,9 @@
 import mongoose from 'mongoose';
-import Complaint, { COMPLAINT_CATEGORIES, VOLUNTEER_WORKFLOW_STATUSES } from '../models/Complaint.js';
+import Complaint, {
+  COMPLAINT_CATEGORIES,
+  COMPLAINT_STATUSES,
+  VOLUNTEER_WORKFLOW_STATUSES
+} from '../models/Complaint.js';
 import Assignment from '../models/Assignment.js';
 import { notifyComplaintResolved, notifyComplaintStatusChange, notifyComplaintSubmitted } from './notificationService.js';
 
@@ -95,34 +99,105 @@ export async function listComplaints(query, req) {
 
 export async function updateComplaintStatus(id, { status, note }, req) {
   if (!['volunteer', 'admin'].includes(req.user.role)) {
-    throw new ComplaintError('Only assigned volunteers or admins can update complaint status', 403, 'FORBIDDEN');
+    throw new ComplaintError(
+      'Only assigned volunteers or admins can update complaint status',
+      403,
+      'FORBIDDEN'
+    );
   }
-  const complaint = await Complaint.findById(objectId(id, 'complaint id'));
+
+  const complaint = await Complaint.findById(
+    objectId(id, 'complaint id')
+  );
+
   ensureAccess(req, complaint);
-  const assignment = req.user.role === 'volunteer'
-    ? await Assignment.findOne({ complaint: complaint._id, volunteer: userId(req), isActive: true })
-    : null;
-  if (req.user.role === 'volunteer' && !assignment) throw new ComplaintError('Volunteers can update only assigned complaints', 403, 'FORBIDDEN');
-  if (!VOLUNTEER_WORKFLOW_STATUSES.includes(status)) {
-    throw new ComplaintError('Invalid volunteer workflow status', 400, 'VALIDATION_ERROR');
+
+  const assignment =
+    req.user.role === 'volunteer'
+      ? await Assignment.findOne({
+          complaint: complaint._id,
+          volunteer: userId(req),
+          isActive: true
+        })
+      : null;
+
+  if (req.user.role === 'volunteer' && !assignment) {
+    throw new ComplaintError(
+      'Volunteers can update only assigned complaints',
+      403,
+      'FORBIDDEN'
+    );
   }
+
+  // Volunteer can only use workflow statuses
+  if (req.user.role === 'volunteer') {
+    if (!VOLUNTEER_WORKFLOW_STATUSES.includes(status)) {
+      throw new ComplaintError(
+        'Invalid volunteer workflow status',
+        400,
+        'VALIDATION_ERROR'
+      );
+    }
+  }
+
+  // Admin can use all complaint statuses
+  if (req.user.role === 'admin') {
+    if (!COMPLAINT_STATUSES.includes(status)) {
+      throw new ComplaintError(
+        'Invalid complaint status',
+        400,
+        'VALIDATION_ERROR'
+      );
+    }
+  }
+
   const previousStatus = complaint.status;
+
   if (previousStatus === status) {
-    throw new ComplaintError('Complaint already has this status', 409, 'CONFLICT');
+    throw new ComplaintError(
+      'Complaint already has this status',
+      409,
+      'CONFLICT'
+    );
   }
 
   complaint.status = status;
-  complaint.statusHistory.push({ eventType: 'status_changed', status, changedBy: userId(req), assignedVolunteer: assignment?.volunteer || complaint.assignedVolunteer, note });
+
+  complaint.statusHistory.push({
+    eventType: 'status_changed',
+    status,
+    changedBy: userId(req),
+    assignedVolunteer:
+      assignment?.volunteer || complaint.assignedVolunteer,
+    note
+  });
+
   await complaint.save();
+
   try {
-    if (status === 'resolved') await notifyComplaintResolved({ complaint, previousStatus, note });
-    else await notifyComplaintStatusChange({ complaint, previousStatus, status, note });
+    if (status === 'resolved') {
+      await notifyComplaintResolved({
+        complaint,
+        previousStatus,
+        note
+      });
+    } else {
+      await notifyComplaintStatusChange({
+        complaint,
+        previousStatus,
+        status,
+        note
+      });
+    }
   } catch (error) {
-    console.error('Complaint status notification failed:', error.message);
+    console.error(
+      'Complaint status notification failed:',
+      error.message
+    );
   }
+
   return complaint;
 }
-
 export function listCategories() {
   return COMPLAINT_CATEGORIES;
 }

@@ -1,0 +1,105 @@
+title,description,category,priority
+Pothole near market,Large pothole outside the central market is damaging vehicles and needs repair,Roads,High
+Broken road at school,Deep road cracks beside the primary school are dangerous for children,Roads,High
+Damaged lane surface,The lane surface has collapsed after rain and residents cannot drive safely,Roads,High
+Road shoulder eroded,The road shoulder is eroded near the bridge and may cause an accident,Roads,High
+Open trench on road,An uncovered trench blocks half the road and is unsafe at night,Roads,High
+Cracked residential street,Several cracks are visible on the residential street but traffic can still pass,Roads,Medium
+Uneven road patch,An uneven patch near the bus stop causes discomfort for two wheelers,Roads,Medium
+Loose paving stones,Paving stones have become loose along the park road,Roads,Medium
+Road markings faded,Lane markings have faded at the junction and should be refreshed,Roads,Medium
+Minor road crack,A small crack has appeared outside my apartment building,Roads,Low
+Dusty unpaved lane,The unpaved lane is dusty and would benefit from basic surfacing,Roads,Low
+Footpath repair needed,A short section of the roadside footpath is broken,Roads,Low
+Speed breaker faded,The speed breaker paint is faded on the quiet service road,Roads,Low
+Road sign leaning,The small road direction sign is leaning but remains readable,Roads,Low
+Gravel on street,Loose gravel is scattered on the street after utility work,Roads,Low
+Dark street outside home,The streetlight outside my home has stopped working and the lane is dark,Streetlights,High
+Lights out at crossing,All lights at the pedestrian crossing are out and visibility is poor,Streetlights,High
+Broken lamp near school,The lamp near the school gate is broken and children walk there after sunset,Streetlights,High
+Street completely unlit,The entire residential lane has no working streetlights tonight,Streetlights,High
+Pole sparking,The streetlight pole is sparking and poses an immediate electrical hazard,Streetlights,High
+Two lamps flickering,Two lamps flicker frequently on the main road and need inspection,Streetlights,Medium
+Dim light on lane,The light on our lane is very dim compared with nearby streets,Streetlights,Medium
+Lamp timer issue,The streetlight turns off too early before dawn each morning,Streetlights,Medium
+Light blocked by tree,A tree blocks the light and leaves the sidewalk poorly lit,Streetlights,Medium
+Single bulb fused,One bulb is fused outside the community hall,Streetlights,Low
+Paint streetlight pole,The streetlight pole paint is peeling and needs routine maintenance,Streetlights,Low
+Light cover missing,The protective cover on a lamp is missing but the lamp works,Streetlights,Low
+Bent lamp arm,The lamp arm is slightly bent after recent winds,Streetlights,Low
+Old light fixture,An old fixture on the side street could be replaced during regular maintenance,Streetlights,Low
+No water supply,There has been no water supply in our neighbourhood since yesterday morning,Water,High
+Broken main water pipe,A main water pipe has burst and water is flooding the road,Water,High
+Contaminated tap water,Tap water is brown and has a strong smell across the block,Water,High
+Water pressure failure,Water pressure suddenly dropped to zero in several homes,Water,High
+Leaking overhead tank,The public overhead tank is leaking heavily and wasting water,Water,High
+Intermittent water supply,Water arrives only briefly each day in our apartment area,Water,Medium
+Low pressure in colony,Water pressure is low during the morning supply window,Water,Medium
+Valve leaking,The valve near the community tap leaks continuously,Water,Medium
+Public tap damaged,The public tap handle is damaged and residents cannot close it,Water,Medium
+Small pipeline leak,A small pipeline leak is forming a puddle near the gate,Water,Low
+Water meter cover missing,The cover of the roadside water meter is missing,Water,Low
+Dripping community tap,The community tap drips after closing and needs a washer,Water,Low
+Water tank cleaning,The neighbourhood water tank appears due for routine cleaning,Water,Low
+Pipe insulation damaged,Insulation around the exposed water pipe is damaged,Water,Low
+Old tap signage,The public drinking water tap needs updated operating instructions,Water,Low
+Overflowing garbage bins,Garbage bins outside the market are overflowing onto the footpath,Waste,High
+Garbage collection missed,Household waste has not been collected for three days and is attracting animals,Waste,High
+Burning waste complaint,Waste is being burned beside homes and smoke is affecting residents,Waste,High
+Medical waste dumped,Sharp medical waste has been dumped near the playground,Waste,High
+Dead animals on road,A dead animal has been left beside the road and creates a health hazard,Waste,High
+Irregular garbage pickup,Garbage pickup is irregular in our street this month,Waste,Medium
+Mixed waste issue,Household and wet waste are being mixed despite separate bins,Waste,Medium
+Bin lid broken,The lid of the public waste bin is broken and rain enters it,Waste,Medium
+Litter near park,Litter is accumulating around the park entrance,Waste,Medium
+Few bins available,There are too few bins near the bus stop during busy hours,Waste,Low
+Recycling bin faded,The recycling bin label is faded and difficult to read,Waste,Low
+Small litter patch,A small litter patch remains beside the community centre,Waste,Low
+Bin needs washing,The public bin needs routine washing and deodorising,Waste,Low
+Compost bin signage,The compost bin needs clearer sorting signage,Waste,Low
+Street sweeping request,The lane needs its scheduled street sweeping service,Waste,Low
+Flooded street after rain,Heavy rain has flooded the street and homes may be affected,Drainage,High
+Open drain overflowing,The open drain is overflowing beside the primary school,Drainage,High
+Blocked storm drain,The storm drain is blocked and water is entering shops,Drainage,High
+Sewage overflow,Dirty water from a sewer is flowing across the residential lane,Drainage,High
+Drain cover missing,A missing drain cover is a serious danger to pedestrians,Drainage,High
+Waterlogging at junction,Water remains for hours at the junction after moderate rain,Drainage,Medium
+Drain full of silt,The roadside drain is full of silt and needs desilting,Drainage,Medium
+Bad smell from drain,A blocked drain produces a strong smell near the apartments,Drainage,Medium
+Broken drain grate,One section of the drain grate is broken near the bus stop,Drainage,Medium
+Small puddle by curb,A small puddle remains beside the curb after watering,Drainage,Low
+Drain cleaning request,The covered drain needs routine cleaning before monsoon,Drainage,Low
+Narrow drain blocked,Leaves are blocking a narrow drain near the park,Drainage,Low
+Missing drain sign,The drain work area needs a visible warning sign,Drainage,Low
+Minor seepage,Minor seepage is visible from the side drain wall,Drainage,Low
+Gutter maintenance,The gutter near the community hall needs routine maintenance,Drainage,Low
+Signal not working,The traffic signal at the main junction is not working and vehicles are confused,Traffic,High
+Dangerous intersection,Traffic is moving in all directions because the junction signal failed,Traffic,High
+Accident risk crossing,The school crossing has no working signal and is unsafe during pickup,Traffic,High
+Road blocked by vehicles,Illegal parking has completely blocked the emergency access road,Traffic,High
+Missing stop sign,The stop sign is missing at a busy intersection,Traffic,High
+Congestion near market,Daily congestion builds near the market during evening hours,Traffic,Medium
+Parking obstruction,Vehicles routinely obstruct one side of the residential street,Traffic,Medium
+Signal timing issue,The signal timing is too short and causes long queues,Traffic,Medium
+Speeding complaint,Cars are speeding through the neighbourhood service lane,Traffic,Medium
+Faded zebra crossing,The zebra crossing paint is faded near the bus stop,Traffic,Low
+Traffic sign dirty,A traffic sign is dirty and hard to read,Traffic,Low
+Street name sign missing,The street name sign is missing from the corner,Traffic,Low
+Minor parking issue,A few vehicles park incorrectly near the small lane,Traffic,Low
+Reflector replacement,Several road reflectors need replacement on the quiet road,Traffic,Low
+Queue at turn,The turning lane forms a short queue during office hours,Traffic,Low
+Stray animal concern,A stray animal frequently wanders near the neighbourhood entrance and needs assistance,Other,Medium
+Public bench damaged,A public bench in the park has a broken plank,Other,Low
+Tree branch fallen,A fallen branch is lying beside the walking path,Other,Medium
+Park gate damaged,The park gate latch is damaged and does not close properly,Other,Low
+Noise from construction,Construction noise continues late at night near homes,Other,Medium
+Illegal poster removal,Posters have been pasted on the public wall and should be removed,Other,Low
+Community toilet issue,The public toilet door lock is broken,Other,Medium
+Missing public notice,A public notice board is missing important civic information,Other,Low
+Mosquito breeding site,Stagnant water behind the unused structure is attracting mosquitoes,Other,High
+Unsafe fallen tree,A large fallen tree is blocking the walking path and may injure people,Other,High
+Broken park railing,The railing around the playground is broken and children could fall,Other,High
+Street name query,Please add a visible name plate to the newly developed lane,Other,Low
+Public facility cleaning,The small public facility needs its regular cleaning visit,Other,Low
+Community hall repair,A ceiling tile in the community hall needs minor repair,Other,Low
+Civic information request,Please provide the schedule for the next neighbourhood maintenance visit,Other,Low

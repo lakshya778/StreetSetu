@@ -4,7 +4,14 @@ import { getApiErrorMessage } from '../api/client.js';
 import { getMyAssignments, updateAssignedComplaintStatus } from '../api/assignments.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
-const statusLabels = { assigned: 'Assigned', in_progress: 'In progress', resolved: 'Resolved' };
+const statusLabels = {
+  assigned: 'Assigned',
+  in_progress: 'In Progress',
+  resolved: 'Resolved',
+  closed: 'Closed',
+  rejected: 'Rejected'
+};
+const RESOLVED_STATUSES = ['resolved', 'closed'];
 
 function statusLabel(status) { return statusLabels[status] || status.replaceAll('_', ' '); }
 
@@ -41,18 +48,62 @@ export default function VolunteerDashboardPage() {
 
   const metrics = useMemo(() => {
     const total = assignments.length;
-    const inProgress = assignments.filter((assignment) => assignment.complaint?.status === 'in_progress').length;
-    const resolved = assignments.filter((assignment) => ['resolved', 'closed'].includes(assignment.complaint?.status)).length;
-    return { total, inProgress, resolved, rate: total ? Math.round((resolved / total) * 100) : 0 };
+    const inProgress = assignments.filter(
+      (assignment) => assignment.complaint?.status === 'in_progress'
+    ).length;
+    const resolved = assignments.filter(
+      (assignment) => RESOLVED_STATUSES.includes(assignment.complaint?.status)
+    ).length;
+    const rejected = assignments.filter(
+      (assignment) => assignment.complaint?.status === 'rejected'
+    ).length;
+    const effectiveTotal = total - rejected;
+
+    return {
+      total,
+      inProgress,
+      resolved,
+      rejected,
+      rate: effectiveTotal > 0 ? Math.round((resolved / effectiveTotal) * 100) : 0
+    };
   }, [assignments]);
 
   const groups = [
     { key: 'assigned', label: 'Assigned', tone: 'assignment-amber' },
     { key: 'in_progress', label: 'In progress', tone: 'assignment-blue' },
-    { key: 'resolved', label: 'Resolved', tone: 'assignment-green' }
-  ];
+    { key: 'resolved', label: 'Resolved', tone: 'assignment-green' },
+    { key: 'rejected', label: 'Rejected', tone: 'assignment-red' }
+];
 
-  return <div className="volunteer-page"><div className="page-heading"><div><p className="eyebrow">Volunteer workspace</p><h1>Good morning, {user?.name?.split(' ')[0] || 'volunteer'}.</h1><p className="page-lede">Your assigned street actions, in one clear view.</p></div><button className="outline-button" onClick={loadAssignments}>Refresh <span>↻</span></button></div>{error && <div className="notice-banner">{error}<button onClick={loadAssignments}>Retry</button></div>}<div className="volunteer-metrics"><article className="volunteer-metric metric-dark"><span>My assignments</span><strong>{isLoading ? '—' : metrics.total}</strong><small>Active complaints</small></article><article className="volunteer-metric"><span>In progress</span><strong>{isLoading ? '—' : metrics.inProgress}</strong><small>Currently being worked</small></article><article className="volunteer-metric"><span>Resolved</span><strong>{isLoading ? '—' : metrics.resolved}</strong><small>Completed assignments</small></article><article className="volunteer-metric metric-lime"><span>Resolution rate</span><strong>{isLoading ? '—' : `${metrics.rate}%`}</strong><small>Across your assignments</small></article></div><div className="assignment-groups">{groups.map((group) => { const items = assignments.filter((assignment) => group.key === 'resolved' ? ['resolved', 'closed'].includes(assignment.complaint?.status) : assignment.complaint?.status === group.key); return <section className="assignment-section" key={group.key}><div className="assignment-section-heading"><div><p className="eyebrow">Workflow</p><h2>{group.label}</h2></div><span className={`assignment-count ${group.tone}`}>{items.length}</span></div>{isLoading ? <div className="loading-state compact-loading">Loading...</div> : items.length ? <div className="assignment-list">{items.map((assignment) => <AssignmentCard key={assignment._id} assignment={assignment} updatingId={updatingId} onStatusChange={handleStatusChange} />)}</div> : <div className="assignment-empty">No {group.label.toLowerCase()} complaints.</div>}</section>; })}</div></div>;
+  return <div className="volunteer-page"><div className="page-heading"><div><p className="eyebrow">Volunteer workspace</p><h1>Good morning, {user?.name?.split(' ')[0] || 'volunteer'}.</h1><p className="page-lede">Your assigned street actions, in one clear view.</p></div><button className="outline-button" onClick={loadAssignments}>Refresh <span>↻</span></button></div>{error && <div className="notice-banner">{error}<button onClick={loadAssignments}>Retry</button></div>}<div className="volunteer-metrics"><article className="volunteer-metric metric-dark"><span>My assignments</span><strong>{isLoading ? '—' : metrics.total}</strong><small>Active complaints</small></article><article className="volunteer-metric"><span>In progress</span><strong>{isLoading ? '—' : metrics.inProgress}</strong><small>Currently being worked</small></article><article className="volunteer-metric">
+  <span>Resolved</span>
+  <strong>{isLoading ? '—' : metrics.resolved}</strong>
+  <small>Completed assignments</small>
+</article>
+
+<article className="volunteer-metric metric-red">
+  <span>Rejected</span>
+  <strong>{isLoading ? '—' : metrics.rejected}</strong>
+  <small>Rejected by admin</small>
+</article>
+
+<article className="volunteer-metric metric-lime">
+  <span>Resolution rate</span>
+  <strong>{isLoading ? '—' : `${metrics.rate}%`}</strong>
+  <small>Across your assignments</small>
+</article></div><div className="assignment-groups">{groups.map((group) => {
+   const items = assignments.filter((assignment) => {
+  const status = assignment.complaint?.status;
+
+  if (group.key === 'resolved') {
+    return RESOLVED_STATUSES.includes(status);
+  }
+
+  if (group.key === 'rejected') {
+    return status === 'rejected';
+  }
+  return status === group.key;
+});return <section className="assignment-section" key={group.key}><div className="assignment-section-heading"><div><p className="eyebrow">Workflow</p><h2>{group.label}</h2></div><span className={`assignment-count ${group.tone}`}>{items.length}</span></div>{isLoading ? <div className="loading-state compact-loading">Loading...</div> : items.length ? <div className="assignment-list">{items.map((assignment) => <AssignmentCard key={assignment._id} assignment={assignment} updatingId={updatingId} onStatusChange={handleStatusChange} />)}</div> : <div className="assignment-empty">No {group.label.toLowerCase()} complaints.</div>}</section>; })}</div></div>;
 }
 
 function AssignmentCard({ assignment, updatingId, onStatusChange }) {
