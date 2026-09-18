@@ -2,7 +2,11 @@ import {
   createComplaint,
   getComplaint,
   listCategories,
+  listMapComplaints,
   listComplaints,
+  removeVote,
+  verifyComplaint,
+  voteForComplaint,
   updateComplaintStatus
 } from '../services/complaintService.js';
 
@@ -32,4 +36,24 @@ export async function updateStatus(req, res, next) {
 
 export function categories(req, res) {
   return res.json({ success: true, data: listCategories() });
+}
+
+export async function verify(req, res, next) {
+  try { return res.json({ success: true, data: await verifyComplaint(req.params.id, req), message: 'Resolution verified successfully' }); }
+  catch (error) { return next(error); }
+}
+
+export async function vote(req, res, next) {
+  try { return res.status(201).json({ success: true, data: await voteForComplaint(req.params.id, req), message: 'Vote recorded successfully' }); }
+  catch (error) { return next(error); }
+}
+
+export async function unvote(req, res, next) {
+  try { return res.json({ success: true, data: await removeVote(req.params.id, req), message: 'Vote removed successfully' }); }
+  catch (error) { return next(error); }
+}
+
+export async function map(req, res, next) {
+  try { return res.json({ success: true, data: await listMapComplaints() }); }
+  catch (error) { return next(error); }
 }

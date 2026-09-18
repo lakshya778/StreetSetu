@@ -5,6 +5,7 @@ import Complaint, {
   VOLUNTEER_WORKFLOW_STATUSES
 } from '../models/Complaint.js';
 import Assignment from '../models/Assignment.js';
+import Vote from '../models/Vote.js';
 import { notifyComplaintResolved, notifyComplaintStatusChange, notifyComplaintSubmitted } from './notificationService.js';
 
 export class ComplaintError extends Error {
@@ -46,12 +47,20 @@ function ensureAccess(req, complaint) {
 
 export async function createComplaint(payload, req) {
   const creator = userId(req);
+  const nearbyDuplicate = await Complaint.findOne({
+    category: payload.category,
+    createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+    location: { $geoWithin: { $centerSphere: [[payload.longitude, payload.latitude], 50 / 6378100] } }
+  }).select('_id');
   const complaint = await Complaint.create({
     ...payload,
     createdBy: creator,
+    isDuplicate: Boolean(nearbyDuplicate),
+    masterComplaint: nearbyDuplicate?._id,
     statusHistory: [{ eventType: 'created', status: 'submitted', changedBy: creator, note: 'Complaint created' }]
   });
   const result = await Complaint.findById(complaint._id).populate('createdBy', 'name email role');
+  result.voteCount = 0;
   try {
     await notifyComplaintSubmitted({ complaint: result });
   } catch (error) {
@@ -67,6 +76,7 @@ export async function getComplaint(id, req) {
     .populate('assignedVolunteer', 'name email role')
     .populate('statusHistory.changedBy', 'name email role');
   ensureAccess(req, complaint);
+  complaint.voteCount = await Vote.countDocuments({ complaint: complaint._id });
   return complaint;
 }
 
@@ -94,7 +104,46 @@ export async function listComplaints(query, req) {
     Complaint.countDocuments(filter)
   ]);
 
+  const voteCounts = await Vote.aggregate([
+    { $match: { complaint: { $in: items.map((item) => item._id) } } },
+    { $group: { _id: '$complaint', count: { $sum: 1 } } }
+  ]);
+  const countsByComplaint = new Map(voteCounts.map((item) => [String(item._id), item.count]));
+  items.forEach((item) => { item.voteCount = countsByComplaint.get(String(item._id)) || 0; });
+
   return { items, page, limit, total, pages: Math.ceil(total / limit) };
+}
+
+export async function verifyComplaint(id, req) {
+  const complaint = await Complaint.findById(objectId(id, 'complaint id'));
+  ensureAccess(req, complaint);
+  if (String(complaint.createdBy) !== String(req.user.sub)) throw new ComplaintError('Only the complaint creator can verify resolution', 403, 'FORBIDDEN');
+  if (complaint.status !== 'resolved') throw new ComplaintError('Only resolved complaints can be verified', 409, 'INVALID_STATUS');
+  complaint.status = 'closed';
+  complaint.verifiedByCitizen = true;
+  complaint.verifiedAt = new Date();
+  complaint.statusHistory.push({ eventType: 'status_changed', status: 'closed', changedBy: userId(req), note: 'Resolution verified by citizen' });
+  await complaint.save();
+  return complaint;
+}
+
+export async function voteForComplaint(id, req) {
+  const complaint = await Complaint.findById(objectId(id, 'complaint id'));
+  if (!complaint) throw new ComplaintError('Complaint not found', 404, 'NOT_FOUND');
+  try { await Vote.create({ complaint: complaint._id, user: userId(req) }); }
+  catch (error) { if (error.code === 11000) throw new ComplaintError('You have already voted for this complaint', 409, 'CONFLICT'); throw error; }
+  return { complaint: complaint._id, voteCount: await Vote.countDocuments({ complaint: complaint._id }) };
+}
+
+export async function removeVote(id, req) {
+  const complaintId = objectId(id, 'complaint id');
+  const result = await Vote.findOneAndDelete({ complaint: complaintId, user: userId(req) });
+  if (!result) throw new ComplaintError('Vote not found', 404, 'NOT_FOUND');
+  return { complaint: complaintId, voteCount: await Vote.countDocuments({ complaint: complaintId }) };
+}
+
+export async function listMapComplaints() {
+  return Complaint.find({ latitude: { $exists: true }, longitude: { $exists: true } }).select('_id title category status latitude longitude').lean();
 }
 
 export async function updateComplaintStatus(id, { status, note }, req) {

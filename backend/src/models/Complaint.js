@@ -85,6 +85,13 @@ const complaintSchema = new mongoose.Schema(
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
     assignedVolunteer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
+    verifiedByCitizen: { type: Boolean, default: false },
+    verifiedAt: { type: Date },
+    severityScore: { type: Number, default: 50, min: 0, max: 100 },
+    isDuplicate: { type: Boolean, default: false },
+    masterComplaint: { type: mongoose.Schema.Types.ObjectId, ref: 'Complaint' },
+    escalated: { type: Boolean, default: false, index: true },
+    escalatedAt: { type: Date },
     statusHistory: { type: [statusHistorySchema], default: [] }
   },
   { timestamps: true }
