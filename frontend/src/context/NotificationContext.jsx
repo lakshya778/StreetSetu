@@ -1,10 +1,16 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { io } from 'socket.io-client';
 import { getApiErrorMessage } from '../api/client.js';
 import { getNotifications, markNotificationRead as markNotificationReadRequest } from '../api/notifications.js';
+import { useAuth } from './AuthContext.jsx';
+
+const REALTIME_URL = import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_API_URL?.replace(/\/api\/v1\/?$/, '') || 'http://localhost:5000';
 
 const NotificationContext = createContext(null);
 
 export function NotificationProvider({ children }) {
+  const { user } = useAuth();
+  const [socket, setSocket] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [notificationMeta, setNotificationMeta] = useState({ total: 0, pages: 1 });
   const [unreadCount, setUnreadCount] = useState(0);
@@ -31,7 +37,7 @@ export function NotificationProvider({ children }) {
 
   async function markRead(id) {
     const current = notifications.find((notification) => notification._id === id);
-    if (!current || current.status === 'read') return;
+    if (current?.status === 'read') return;
     try {
       await markNotificationReadRequest(id);
       setNotifications((items) => items.map((notification) => notification._id === id ? { ...notification, status: 'read', readAt: new Date().toISOString() } : notification));
@@ -42,9 +48,37 @@ export function NotificationProvider({ children }) {
     }
   }
 
-  useEffect(() => { refreshNotifications(); }, []);
+  useEffect(() => { if (user) refreshNotifications(); }, [user?._id]);
 
-  const value = useMemo(() => ({ notifications, notificationMeta, unreadCount, isLoading, error, refreshNotifications, markRead }), [notifications, notificationMeta, unreadCount, isLoading, error]);
+  useEffect(() => {
+    if (!user) { setSocket(null); return undefined; }
+    const token = localStorage.getItem('streetsetu_token');
+    const connection = io(REALTIME_URL, { auth: { token }, withCredentials: true, reconnection: true });
+    setSocket(connection);
+    connection.on('notification:new', (notification) => {
+      setNotifications((items) => [notification, ...items.filter((item) => item._id !== notification._id)].slice(0, 20));
+      setNotificationMeta((current) => ({ ...current, total: current.total + 1 }));
+      if (notification.status !== 'read') setUnreadCount((count) => count + 1);
+    });
+    const dispatchUpdate = (payload) => window.dispatchEvent(new CustomEvent('streetsetu:live-update', { detail: payload }));
+    connection.on('dashboard:updated', dispatchUpdate);
+    connection.on('complaint:assigned', dispatchUpdate);
+    connection.on('complaint:reassigned', dispatchUpdate);
+    connection.on('complaint:status', dispatchUpdate);
+    connection.on('complaint:rejected', dispatchUpdate);
+    function refreshSocketToken(event) {
+      connection.auth = { token: event.detail.accessToken };
+      connection.disconnect().connect();
+    }
+    window.addEventListener('streetsetu:token-refreshed', refreshSocketToken);
+    return () => {
+      window.removeEventListener('streetsetu:token-refreshed', refreshSocketToken);
+      connection.disconnect();
+      setSocket(null);
+    };
+  }, [user?._id]);
+
+  const value = useMemo(() => ({ notifications, notificationMeta, unreadCount, isLoading, error, refreshNotifications, markRead, socket }), [notifications, notificationMeta, unreadCount, isLoading, error, socket]);
   return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>;
 }
 

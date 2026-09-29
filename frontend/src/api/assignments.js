@@ -10,8 +10,13 @@ export async function updateAssignedComplaintStatus(complaintId, payload) {
   return data.data;
 }
 
-export async function assignComplaint(complaintId, volunteerId) {
-  const { data } = await api.post(`/assignments/${complaintId}/assign`, { volunteerId });
+export async function assignComplaint(complaintId, volunteerId, { recommendationAccepted = false } = {}) {
+  const { data } = await api.post(`/assignments/${complaintId}/assign`, { volunteerId, recommendationAccepted });
+  return data.data;
+}
+
+export async function getVolunteerRecommendations(complaintId) {
+  const { data } = await api.get(`/assignments/${complaintId}/recommendations`);
   return data.data;
 }
 

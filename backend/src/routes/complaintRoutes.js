@@ -12,7 +12,7 @@ const router = Router();
 
 router.use(authenticate);
 router.get('/categories', categories);
-router.get('/map', authorize('citizen', 'volunteer', 'admin'), map);
+router.get('/map', authorize('citizen', 'volunteer', 'admin'), validateListComplaints, map);
 router.post('/', authorize('citizen', 'volunteer', 'admin'), validateCreateComplaint, create);
 router.get('/', authorize('citizen', 'volunteer', 'admin'), validateListComplaints, list);
 router.get('/:id', authorize('citizen', 'volunteer', 'admin'), detail);

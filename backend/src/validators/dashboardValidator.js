@@ -18,14 +18,14 @@ export function validateDashboardQuery(req, res, next) {
     details.push({ field: 'wardId', message: 'Ward id must be a valid identifier' });
   }
   if (from !== undefined) {
-    fromDate = new Date(from);
-    if (Number.isNaN(fromDate.getTime())) {
+    fromDate = typeof from === 'string' ? new Date(from) : null;
+    if (!fromDate || Number.isNaN(fromDate.getTime())) {
       details.push({ field: 'from', message: 'From must be a valid ISO date' });
     }
   }
   if (to !== undefined) {
-    toDate = new Date(to);
-    if (Number.isNaN(toDate.getTime())) {
+    toDate = typeof to === 'string' ? new Date(to) : null;
+    if (!toDate || Number.isNaN(toDate.getTime())) {
       details.push({ field: 'to', message: 'To must be a valid ISO date' });
     }
   }

@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { COMPLAINT_CATEGORIES } from './Complaint.js';
 
 const userSchema = new mongoose.Schema(
   {
@@ -6,6 +7,19 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true, select: false },
     role: { type: String, enum: ['citizen', 'volunteer', 'admin'], default: 'citizen' },
+    expertiseCategories: { type: [{ type: String, enum: COMPLAINT_CATEGORIES }], default: [] },
+    location: {
+      type: { type: String, enum: ['Point'], default: 'Point' },
+      coordinates: {
+        type: [Number],
+        validate: {
+          validator: (coordinates) => coordinates.length === 2
+            && coordinates[0] >= -180 && coordinates[0] <= 180
+            && coordinates[1] >= -90 && coordinates[1] <= 90,
+          message: 'Volunteer coordinates must be [longitude, latitude]'
+        }
+      }
+    },
     isActive: { type: Boolean, default: true }
   },
   { timestamps: true }
@@ -16,5 +30,7 @@ userSchema.methods.toJSON = function toJSON() {
   delete user.passwordHash;
   return user;
 };
+
+userSchema.index({ location: '2dsphere' });
 
 export default mongoose.model('User', userSchema);

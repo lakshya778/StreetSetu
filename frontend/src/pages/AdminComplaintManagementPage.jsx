@@ -2,14 +2,17 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/client.js';
 import { complaintCategories, getComplaints } from '../api/complaints.js';
-import { assignComplaint, reassignComplaint } from '../api/assignments.js';
+import { assignComplaint, getVolunteerRecommendations, reassignComplaint } from '../api/assignments.js';
 import ComplaintMap from '../components/maps/ComplaintMap.jsx';
 import { statusLabel } from '../components/complaints/ComplaintCard.jsx';
+import { useNotifications } from '../context/NotificationContext.jsx';
 
 export default function AdminComplaintManagementPage() {
+  const { socket } = useNotifications();
   const [result, setResult] = useState({ items: [], total: 0, pages: 1 });
-  const [filters, setFilters] = useState({ status: '', category: '', priority: '', page: 1, limit: 12 });
+  const [filters, setFilters] = useState({ status: '', category: '', priority: '', search: '', page: 1, limit: 12 });
   const [volunteerIds, setVolunteerIds] = useState({});
+  const [recommendations, setRecommendations] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [activeAction, setActiveAction] = useState('');
   const [error, setError] = useState('');
@@ -23,6 +26,11 @@ export default function AdminComplaintManagementPage() {
   }
 
   useEffect(() => { loadComplaints(); }, [filters]);
+  useEffect(() => {
+    if (!socket) return undefined;
+    socket.on('dashboard:updated', loadComplaints);
+    return () => socket.off('dashboard:updated', loadComplaints);
+  }, [socket, filters]);
 
   function updateFilter(event) { setFilters((current) => ({ ...current, [event.target.name]: event.target.value, page: 1 })); }
   function updateVolunteerId(id, value) { setVolunteerIds((current) => ({ ...current, [id]: value })); }
@@ -32,10 +40,64 @@ export default function AdminComplaintManagementPage() {
     if (!volunteerId) { setError('Enter a volunteer ID before assigning.'); return; }
     setActiveAction(`${reassign ? 'reassign' : 'assign'}-${complaint._id}`);
     setError('');
-    try { await (reassign ? reassignComplaint : assignComplaint)(complaint._id, volunteerId); await loadComplaints(); setVolunteerIds((current) => ({ ...current, [complaint._id]: '' })); }
-    catch (requestError) { setError(getApiErrorMessage(requestError, 'The complaint assignment could not be saved.')); }
-    finally { setActiveAction(''); }
+    try {
+      await (reassign ? reassignComplaint : assignComplaint)(complaint._id, volunteerId);
+      await loadComplaints();
+      setVolunteerIds((current) => ({ ...current, [complaint._id]: '' }));
+    } catch (requestError) {
+      setError(getApiErrorMessage(requestError, 'The complaint assignment could not be saved.'));
+    } finally { setActiveAction(''); }
   }
 
-  return <div className="admin-complaints-page"><div className="page-heading"><div><p className="eyebrow">Admin operations</p><h1>Complaint management</h1><p className="page-lede">Review every report, assign ownership, and follow the full history.</p></div><span className="admin-report-count">{result.total || 0} total reports</span></div><div className="complaint-toolbar"><div className="filter-label">Filter reports</div><select name="status" value={filters.status} onChange={updateFilter}><option value="">All statuses</option><option value="submitted">Submitted</option><option value="under_review">Under review</option><option value="assigned">Assigned</option><option value="in_progress">In progress</option><option value="resolved">Resolved</option><option value="closed">Closed</option><option value="rejected">Rejected</option></select><select name="category" value={filters.category} onChange={updateFilter}><option value="">All categories</option>{complaintCategories.map((category) => <option key={category} value={category}>{category.replaceAll('_', ' ')}</option>)}</select><select name="priority" value={filters.priority} onChange={updateFilter}><option value="">All priorities</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option></select></div>{error && <div className="notice-banner">{error}<button onClick={loadComplaints}>Retry</button></div>}{!isLoading && result.items.length > 0 && <ComplaintMap complaints={result.items} className="complaints-overview-map" />}{isLoading ? <div className="loading-state">Loading all complaints...</div> : <div className="admin-complaint-table panel"><div className="admin-table-head"><span>Complaint</span><span>Status</span><span>Assignment</span><span>Action</span></div>{result.items.length ? result.items.map((complaint) => <article className="admin-complaint-row" key={complaint._id}><div className="admin-complaint-title"><strong>{complaint.title}</strong><small>{complaint.category?.replaceAll('_', ' ')} · {complaint.priority} priority</small><Link to={`/dashboard/complaints/${complaint._id}`}>View timeline →</Link></div><div><span className={`detail-status status-${complaint.status}`}><i />{statusLabel(complaint.status)}</span></div><div className="assignment-summary"><strong>{complaint.assignedVolunteer?.name || 'Unassigned'}</strong><small>{complaint.assignedVolunteer?.email || 'No active volunteer'}</small></div><div className="admin-assignment-action"><input value={volunteerIds[complaint._id] || ''} onChange={(event) => updateVolunteerId(complaint._id, event.target.value)} placeholder="Volunteer ID" aria-label={`Volunteer ID for ${complaint.title}`} /><div><button disabled={activeAction === `assign-${complaint._id}`} onClick={() => handleAssignment(complaint, false)}>{activeAction === `assign-${complaint._id}` ? 'Saving...' : complaint.assignedVolunteer ? 'Assign' : 'Assign volunteer'}</button>{complaint.assignedVolunteer && <button disabled={activeAction === `reassign-${complaint._id}`} onClick={() => handleAssignment(complaint, true)}>{activeAction === `reassign-${complaint._id}` ? 'Saving...' : 'Reassign'}</button>}</div></div></article>) : <div className="empty-state"><span>◈</span><strong>No complaints found</strong><p>Try a different set of filters.</p></div>}</div>}{result.pages > 1 && <div className="pagination"><button disabled={filters.page <= 1} onClick={() => setFilters((current) => ({ ...current, page: current.page - 1 }))}>← Previous</button><span>Page {result.page} of {result.pages}</span><button disabled={filters.page >= result.pages} onClick={() => setFilters((current) => ({ ...current, page: current.page + 1 }))}>Next →</button></div>}</div>;
+  async function handleRecommendations(complaint) {
+    setActiveAction(`recommend-${complaint._id}`);
+    setError('');
+    try {
+      const ranked = await getVolunteerRecommendations(complaint._id);
+      setRecommendations((current) => ({ ...current, [complaint._id]: ranked }));
+    } catch (requestError) {
+      setError(getApiErrorMessage(requestError, 'Volunteer recommendations could not be loaded.'));
+    } finally { setActiveAction(''); }
+  }
+
+  async function acceptRecommendation(complaint, volunteerId) {
+    setActiveAction(`accept-${complaint._id}`);
+    setError('');
+    try {
+      await assignComplaint(complaint._id, volunteerId, { recommendationAccepted: true });
+      setRecommendations((current) => ({ ...current, [complaint._id]: null }));
+      await loadComplaints();
+    } catch (requestError) {
+      setError(getApiErrorMessage(requestError, 'Recommended volunteer could not be assigned.'));
+    } finally { setActiveAction(''); }
+  }
+
+  function renderAssignmentAction(complaint) {
+    if (complaint.status === 'under_review') {
+      return <><div className="admin-assignment-action"><button disabled={activeAction === `recommend-${complaint._id}`} onClick={() => handleRecommendations(complaint)}>{activeAction === `recommend-${complaint._id}` ? 'Ranking...' : 'Recommend volunteer'}</button><input value={volunteerIds[complaint._id] || ''} onChange={(event) => updateVolunteerId(complaint._id, event.target.value)} placeholder="Volunteer ID" aria-label={`Volunteer ID for ${complaint.title}`} /><button disabled={activeAction === `assign-${complaint._id}`} onClick={() => handleAssignment(complaint, false)}>{activeAction === `assign-${complaint._id}` ? 'Saving...' : 'Assign volunteer'}</button></div>{recommendations[complaint._id]?.length > 0 && <div className="recommendation-list">{recommendations[complaint._id].map((item) => <div className="recommendation-row" key={item.volunteerId}><span><strong>{item.name}</strong><small>Score {item.score} · {item.activeComplaints} active · {item.distanceKm == null ? 'distance unknown' : `${item.distanceKm} km away`}</small></span><button disabled={activeAction === `accept-${complaint._id}`} onClick={() => acceptRecommendation(complaint, item.volunteerId)}>Assign</button></div>)}</div>}</>;
+    }
+    if (complaint.assignedVolunteer && ['assigned', 'in_progress'].includes(complaint.status)) {
+      return <div className="admin-assignment-action"><input value={volunteerIds[complaint._id] || ''} onChange={(event) => updateVolunteerId(complaint._id, event.target.value)} placeholder="New volunteer ID" aria-label={`New volunteer ID for ${complaint.title}`} /><button disabled={activeAction === `reassign-${complaint._id}`} onClick={() => handleAssignment(complaint, true)}>{activeAction === `reassign-${complaint._id}` ? 'Saving...' : 'Reassign'}</button></div>;
+    }
+    if (complaint.status === 'submitted') return <Link className="assignment-review-link" to={`/dashboard/complaints/${complaint._id}`}>Review before assignment →</Link>;
+    return <span className="assignment-unavailable">No assignment action</span>;
+  }
+
+  return <div className="admin-complaints-page">
+    <div className="page-heading"><div><p className="eyebrow">Admin operations</p><h1>Complaint management</h1><p className="page-lede">Review every report, assign ownership, and follow the full history.</p></div><span className="admin-report-count">{result.total || 0} total reports</span></div>
+    <div className="complaint-toolbar"><div className="filter-label">Filter reports</div><select name="status" value={filters.status} onChange={updateFilter}><option value="">All statuses</option><option value="submitted">Submitted</option><option value="under_review">Under review</option><option value="assigned">Assigned</option><option value="in_progress">In progress</option><option value="resolved">Resolved</option><option value="closed">Closed</option><option value="rejected">Rejected</option></select><select name="category" value={filters.category} onChange={updateFilter}><option value="">All categories</option>{complaintCategories.map((category) => <option key={category} value={category}>{category.replaceAll('_', ' ')}</option>)}</select><select name="priority" value={filters.priority} onChange={updateFilter}><option value="">All priorities</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option></select></div>
+    <label className="admin-search-field">Search reports<input name="search" value={filters.search} onChange={updateFilter} placeholder="Title, description, or address" /></label>
+    {error && <div className="notice-banner">{error}<button onClick={loadComplaints}>Retry</button></div>}
+    {!isLoading && result.items.length > 0 && <ComplaintMap complaints={result.items} className="complaints-overview-map" />}
+    {isLoading ? <div className="loading-state">Loading all complaints...</div> : <div className="admin-complaint-table panel">
+      <div className="admin-table-head"><span>Complaint</span><span>Status</span><span>Assignment</span><span>Action</span></div>
+      {result.items.length ? result.items.map((complaint) => <article className="admin-complaint-row" key={complaint._id}>
+        <div className="admin-complaint-title"><strong>{complaint.title}</strong><small>{complaint.category?.replaceAll('_', ' ')} · {complaint.priority} priority</small><Link to={`/dashboard/complaints/${complaint._id}`}>View timeline →</Link></div>
+        <div><span className={`detail-status status-${complaint.status}`}><i />{statusLabel(complaint.status)}</span></div>
+        <div className="assignment-summary"><strong>{complaint.assignedVolunteer?.name || 'Unassigned'}</strong><small>{complaint.assignedVolunteer?.email || 'No active volunteer'}</small></div>
+        <div>{renderAssignmentAction(complaint)}</div>
+      </article>) : <div className="empty-state"><span>◈</span><strong>No complaints found</strong><p>Try a different set of filters.</p></div>}
+    </div>}
+    {result.pages > 1 && <div className="pagination"><button disabled={filters.page <= 1} onClick={() => setFilters((current) => ({ ...current, page: current.page - 1 }))}>← Previous</button><span>Page {result.page} of {result.pages}</span><button disabled={filters.page >= result.pages} onClick={() => setFilters((current) => ({ ...current, page: current.page + 1 }))}>Next →</button></div>}
+  </div>;
 }

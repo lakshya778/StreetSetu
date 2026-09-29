@@ -1,5 +1,35 @@
 # StreetSetu MongoDB Schema Design
 
+## Production sessions and audit additions
+
+`refreshsessions` stores rotating refresh-session metadata. It stores a SHA-256 token hash, never the raw refresh token, and has a TTL index on `expiresAt`. Revocation is recorded in `revokedAt`; user, request IP, and user-agent metadata support session management and investigations.
+
+`auditlogs` stores actor, action, entity type/id, previous/new values, metadata, request ID, IP address, user agent, and timestamps. Indexes support created-time ordering, actor/action/entity filters, and request correlation. Complaint create, status, assignment, vote, and field-evidence operations write audit events while lifecycle history remains embedded in each complaint for backwards-compatible detail reads.
+
+## Production deployment notes
+
+MongoDB Atlas is the production operational database; set `MONGO_URI` to a least-privilege application user connection string with TLS and IP/network access restricted to the deployment. No relational schema or migration is added by Production Release v1. Atlas replica-set transactions can be introduced later if multi-document assignment/audit writes need atomicity.
+
+## GEO, media, and assignment additions
+
+The existing `complaints` collection retains its current shape and adds/uses these fields:
+
+```json
+{
+  "location": { "type": "Point", "coordinates": [77.2, 28.61] },
+  "attachments": [{ "url": "https://res.cloudinary.com/...", "mimeType": "image/jpeg", "fileName": "street.jpg", "size": 12345, "storageKey": "streetsetu/complaints/...", "uploadedBy": "ObjectId", "uploadedAt": "Date", "stage": "complaint" }],
+  "beforeImages": [{ "url": "https://res.cloudinary.com/...", "mimeType": "image/jpeg", "size": 12345, "storageKey": "...", "uploadedBy": "ObjectId", "uploadedAt": "Date", "stage": "before" }],
+  "afterImages": [{ "url": "https://res.cloudinary.com/...", "mimeType": "image/jpeg", "size": 12345, "storageKey": "...", "uploadedBy": "ObjectId", "uploadedAt": "Date", "stage": "after" }],
+  "resolvedAt": "Date"
+}
+```
+
+Images live in Cloudinary; MongoDB stores their URL, storage key, MIME type, size, name, uploader, timestamp, and workflow stage. Uploads accept JPG/JPEG/PNG/WebP up to 5 MiB, with at most 5 per request/stage. The `location` field has a `2dsphere` index.
+
+Volunteer `users` may also hold `expertiseCategories: [category]` and `location: { type: "Point", coordinates: [longitude, latitude] }` with a `2dsphere` index. Assignment recommendations are computed from this profile plus assignment history; no new collection is required.
+
+Status changes continue to append to `complaints.statusHistory`, including actor, previous/new status, note, and `changedAt`. Rejection fields (`rejectionReason`, `rejectedAt`, `rejectedBy`) and the `notifications` collection support rejection workflows. No migration is needed because these are optional/defaulted document fields and existing APIs still accept older payloads.
+
 ## 1. Database Architecture Decision
 
 StreetSetu should use MongoDB as the primary operational database for highly flexible civic issue, workflow, event, location, media, and AI evidence records. MongoDB is preferred because the platform needs:
@@ -427,6 +457,29 @@ Validation rules:
 - `reporterUserId` is required
 - `categoryId` is required
 - `wardId` is required
+
+#### Implemented complaint rejection fields
+
+The running Mongoose model is `Complaint` (MongoDB collection `complaints`). Its rejection lifecycle adds these optional fields so existing documents remain readable without migration:
+
+```json
+{
+  "rejectedAt": "date",
+  "rejectedBy": "ObjectId reference to users",
+  "rejectionReason": "string, maximum 1000 characters",
+  "statusHistory": [
+    {
+      "previousStatus": "string from the complaint status enum, omitted for initial creation",
+      "status": "string from the complaint status enum",
+      "changedBy": "ObjectId reference to users",
+      "changedAt": "date",
+      "note": "string; required for a rejection event"
+    }
+  ]
+}
+```
+
+New rejections populate all three rejection fields and append a history entry. Older rejected documents may not have these values and are not backfilled because their reasons and actors cannot be reliably inferred.
 
 ---
 

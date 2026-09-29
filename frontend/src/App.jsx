@@ -1,19 +1,21 @@
+import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import DashboardLayout from './components/layout/DashboardLayout.jsx';
-import DashboardHomePage from './pages/DashboardHomePage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
-import WorkspacePage from './pages/WorkspacePage.jsx';
-import ComplaintListPage from './pages/ComplaintListPage.jsx';
-import CreateComplaintPage from './pages/CreateComplaintPage.jsx';
-import ComplaintDetailsPage from './pages/ComplaintDetailsPage.jsx';
-import NotificationPage from './pages/NotificationPage.jsx';
-import ComplaintManagementHomePage from './pages/ComplaintManagementHomePage.jsx';
+
+const DashboardHomePage = lazy(() => import('./pages/DashboardHomePage.jsx'));
+const WorkspacePage = lazy(() => import('./pages/WorkspacePage.jsx'));
+const ComplaintListPage = lazy(() => import('./pages/ComplaintListPage.jsx'));
+const CreateComplaintPage = lazy(() => import('./pages/CreateComplaintPage.jsx'));
+const ComplaintDetailsPage = lazy(() => import('./pages/ComplaintDetailsPage.jsx'));
+const NotificationPage = lazy(() => import('./pages/NotificationPage.jsx'));
+const ComplaintManagementHomePage = lazy(() => import('./pages/ComplaintManagementHomePage.jsx'));
 
 export default function App() {
   return (
-    <Routes>
+    <Suspense fallback={<div className="loading-state">Loading StreetSetu...</div>}><Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route element={<ProtectedRoute />}>
@@ -29,6 +31,6 @@ export default function App() {
       </Route>
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
-    </Routes>
+    </Routes></Suspense>
   );
 }

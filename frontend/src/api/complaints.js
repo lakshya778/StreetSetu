@@ -47,3 +47,13 @@ export async function uploadComplaintImages(files) {
   });
   return data.data.attachments;
 }
+
+export async function uploadWorkEvidence(complaintId, stage, files) {
+  if (!['before', 'after'].includes(stage)) throw new Error('Evidence stage must be before or after');
+  const formData = new FormData();
+  files.forEach((file) => formData.append('images', file));
+  const { data } = await api.post(`/uploads/complaints/${complaintId}/${stage}-images`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+  return data.data.images;
+}

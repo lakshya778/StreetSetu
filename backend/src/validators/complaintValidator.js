@@ -48,8 +48,8 @@ function validateLocation(body, details) {
 
 function validateAttachments(attachments, details) {
   if (attachments === undefined) return;
-  if (!Array.isArray(attachments) || attachments.length > 10) {
-    details.push({ field: 'attachments', message: 'Attachments must be an array with at most 10 items' });
+  if (!Array.isArray(attachments) || attachments.length > 5) {
+    details.push({ field: 'attachments', message: 'Attachments must be an array with at most 5 items' });
     return;
   }
 
@@ -60,8 +60,8 @@ function validateAttachments(attachments, details) {
     if (!attachment || !MIME_TYPES.has(attachment.mimeType)) {
       details.push({ field: `attachments.${index}.mimeType`, message: 'Only JPEG, PNG, and WebP images are supported' });
     }
-    if (attachment?.size !== undefined && (!Number.isInteger(attachment.size) || attachment.size < 0)) {
-      details.push({ field: `attachments.${index}.size`, message: 'Attachment size must be a non-negative integer' });
+    if (attachment?.size !== undefined && (!Number.isInteger(attachment.size) || attachment.size < 0 || attachment.size > 5 * 1024 * 1024)) {
+      details.push({ field: `attachments.${index}.size`, message: 'Attachment size must be between 0 and 5 MB' });
     }
   });
 }
@@ -114,6 +114,10 @@ export function validateStatusUpdate(req, res, next) {
   if (req.body?.note !== undefined && (typeof req.body.note !== 'string' || req.body.note.trim().length > 1000)) {
     details.push({ field: 'note', message: 'Note must be at most 1000 characters' });
   }
+  if (req.body?.status === 'rejected'
+    && (typeof req.body.note !== 'string' || req.body.note.trim().length === 0)) {
+    details.push({ field: 'note', message: 'A rejection reason is required' });
+  }
   if (details.length > 0) return next(validationError(details));
   req.body = { status: req.body.status, note: req.body.note?.trim() };
   return next();
@@ -133,9 +137,12 @@ export function validateListComplaints(req, res, next) {
   const query = req.query;
   const page = Number.parseInt(query.page, 10);
   const limit = Number.parseInt(query.limit, 10);
-  const status = query.status?.trim() || undefined;
-  const category = query.category?.trim() || undefined;
-  const priority = query.priority?.trim() || undefined;
+  const status = typeof query.status === 'string' ? query.status.trim() || undefined : undefined;
+  const category = typeof query.category === 'string' ? query.category.trim() || undefined : undefined;
+  const priority = typeof query.priority === 'string' ? query.priority.trim() || undefined : undefined;
+  const search = typeof query.search === 'string' ? query.search.trim() || undefined : undefined;
+  const fromDate = typeof query.from === 'string' && query.from ? new Date(query.from) : undefined;
+  const toDate = typeof query.to === 'string' && query.to ? new Date(query.to) : undefined;
 
   if (query.page !== undefined && (!Number.isInteger(page) || page < 1)) {
     details.push({ field: 'page', message: 'Page must be a positive integer' });
@@ -152,12 +159,22 @@ export function validateListComplaints(req, res, next) {
   if (priority !== undefined && !COMPLAINT_PRIORITIES.includes(priority)) {
     details.push({ field: 'priority', message: `Priority must be one of: ${COMPLAINT_PRIORITIES.join(', ')}` });
   }
-  if (query.assignedTo !== undefined && !/^[a-f\d]{24}$/i.test(query.assignedTo)) {
+  for (const field of ['status', 'category', 'priority', 'search', 'from', 'to']) {
+    if (query[field] !== undefined && typeof query[field] !== 'string') details.push({ field, message: `${field} must be a string` });
+  }
+  if (search !== undefined && search.length > 120) details.push({ field: 'search', message: 'Search must be at most 120 characters' });
+  if (query.from !== undefined && Number.isNaN(fromDate.getTime())) details.push({ field: 'from', message: 'From must be a valid date' });
+  if (query.to !== undefined && Number.isNaN(toDate.getTime())) details.push({ field: 'to', message: 'To must be a valid date' });
+  if (fromDate && toDate && fromDate > toDate) details.push({ field: 'to', message: 'To date must be after from date' });
+  if (query.assignedTo !== undefined && (typeof query.assignedTo !== 'string' || !/^[a-f\d]{24}$/i.test(query.assignedTo))) {
     details.push({ field: 'assignedTo', message: 'Assigned user id must be valid' });
   }
   if (details.length > 0) return next(validationError(details));
   req.query.status = status;
   req.query.category = category;
   req.query.priority = priority;
+  req.query.search = search;
+  req.query.fromDate = fromDate;
+  req.query.toDate = toDate;
   return next();
 }

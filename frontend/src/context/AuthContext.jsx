@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import api from '../api/client.js';
 
 const SESSION_KEY = 'streetsetu_session';
@@ -34,10 +34,17 @@ export function AuthProvider({ children }) {
   }
 
   function logout() {
+    api.post('/auth/logout').catch(() => {});
     localStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(TOKEN_KEY);
     setUser(null);
   }
+
+  useEffect(() => {
+    const handleExpired = () => setUser(null);
+    window.addEventListener('streetsetu:session-expired', handleExpired);
+    return () => window.removeEventListener('streetsetu:session-expired', handleExpired);
+  }, []);
 
   const value = useMemo(() => ({ user, login, register, logout }), [user]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

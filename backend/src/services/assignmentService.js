@@ -2,7 +2,9 @@ import mongoose from 'mongoose';
 import Assignment from '../models/Assignment.js';
 import Complaint, { VOLUNTEER_WORKFLOW_STATUSES } from '../models/Complaint.js';
 import User from '../models/User.js';
-import { notifyVolunteerAssigned } from './notificationService.js';
+import { notifyRecommendationAccepted, notifyVolunteerAssigned } from './notificationService.js';
+import { publishComplaintUpdate, removeUserFromComplaintRoom } from './realtimeService.js';
+import { recordAudit } from './auditService.js';
 
 export class AssignmentError extends Error {
   constructor(message, statusCode = 400, code = 'ASSIGNMENT_ERROR') {
@@ -39,12 +41,23 @@ function statusFromWorkflow(status) {
 }
 
 async function writeAssignment(complaint, volunteer, req, eventType, note) {
+  const canAssign = eventType === 'reassigned'
+    ? ['assigned', 'in_progress'].includes(complaint.status)
+    : complaint.status === 'under_review';
+  if (!canAssign) {
+    throw new AssignmentError(
+      'Only complaints under review can be assigned',
+      409,
+      'INVALID_STATUS_TRANSITION'
+    );
+  }
   const current = await Assignment.findOne({ complaint: complaint._id, isActive: true });
   if (current) {
     current.isActive = false;
     current.endedAt = new Date();
     current.endReason = eventType === 'reassigned' ? 'Reassigned by admin' : 'Assignment replaced';
     await current.save();
+    if (eventType === 'reassigned') removeUserFromComplaintRoom(current.volunteer, complaint._id);
   }
 
   const assignment = await Assignment.create({
@@ -55,15 +68,19 @@ async function writeAssignment(complaint, volunteer, req, eventType, note) {
   const previousStatus = complaint.status;
   complaint.assignedVolunteer = volunteer._id;
   complaint.assignedTo = volunteer._id;
-  complaint.status = 'assigned';
+  complaint.status = eventType === 'reassigned' ? previousStatus : 'assigned';
   complaint.statusHistory.push({
     eventType,
-    status: 'assigned',
+    previousStatus,
+    status: complaint.status,
     changedBy: new mongoose.Types.ObjectId(req.user.sub),
     assignedVolunteer: volunteer._id,
-    note
+    note,
+    changedAt: new Date()
   });
   await complaint.save();
+  await recordAudit({ req, action: `complaint.${eventType}`, entityType: 'complaint', entityId: complaint._id, previousValue, newValue: complaint.status, metadata: { assignedVolunteer: String(volunteer._id) } });
+  publishComplaintUpdate(complaint, eventType === 'reassigned' ? 'complaint:reassigned' : 'complaint:assigned');
 
   try {
     await notifyVolunteerAssigned({
@@ -77,13 +94,21 @@ async function writeAssignment(complaint, volunteer, req, eventType, note) {
   return assignment;
 }
 
-export async function assignComplaint(complaintId, volunteerId, req) {
+export async function assignComplaint(complaintId, volunteerId, req, { recommendationAccepted = false } = {}) {
   requireAdmin(req);
   const complaint = await getComplaint(complaintId);
   const existing = await Assignment.findOne({ complaint: complaint._id, isActive: true });
   if (existing) throw new AssignmentError('Complaint already has an active volunteer assignment', 409, 'ACTIVE_ASSIGNMENT_EXISTS');
   const volunteer = await getVolunteer(volunteerId);
-  return writeAssignment(complaint, volunteer, req, 'assigned', 'Complaint assigned by admin');
+  const assignment = await writeAssignment(complaint, volunteer, req, 'assigned', 'Complaint assigned by admin');
+  if (recommendationAccepted) {
+    try {
+      await notifyRecommendationAccepted({ complaint, volunteerId: volunteer._id, acceptedBy: req.user.sub });
+    } catch (error) {
+      console.error('Recommendation acceptance notification failed:', error.message);
+    }
+  }
+  return assignment;
 }
 
 export async function reassignComplaint(complaintId, volunteerId, req) {
@@ -122,15 +147,32 @@ export async function updateAssignedStatus(complaintId, { status, note }, req) {
   if (complaint.status === status) throw new AssignmentError('Complaint already has this status', 409, 'CONFLICT');
 
   const previousStatus = complaint.status;
+  const allowedNextStatus = previousStatus === 'assigned'
+    ? 'in_progress'
+    : previousStatus === 'in_progress' ? 'resolved' : null;
+  if (status !== allowedNextStatus) {
+    throw new AssignmentError(`Complaint cannot move from ${previousStatus} to ${status}`, 409, 'INVALID_STATUS_TRANSITION');
+  }
+  if (status === 'in_progress' && complaint.beforeImages.length === 0) {
+    throw new AssignmentError('Upload at least one work-start image before starting this complaint', 409, 'WORK_EVIDENCE_REQUIRED');
+  }
+  if (status === 'resolved' && complaint.afterImages.length === 0) {
+    throw new AssignmentError('Upload at least one completion image before resolving this complaint', 409, 'WORK_EVIDENCE_REQUIRED');
+  }
   complaint.status = statusFromWorkflow(status);
+  if (status === 'resolved') complaint.resolvedAt = new Date();
   complaint.statusHistory.push({
     eventType: 'status_changed',
+    previousStatus,
     status,
     changedBy: objectId(req.user.sub, 'user id'),
     assignedVolunteer: assignment.volunteer,
-    note
+    note,
+    changedAt: new Date()
   });
   await complaint.save();
+  await recordAudit({ req, action: 'complaint.status_changed', entityType: 'complaint', entityId: complaint._id, previousValue, newValue: status, metadata: { note } });
+  publishComplaintUpdate(complaint, 'complaint:status');
   try {
     await notifyComplaintStatusChange({ complaint, previousStatus, status, note });
   } catch (error) {

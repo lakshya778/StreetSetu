@@ -1,4 +1,7 @@
+import * as Sentry from '@sentry/node';
+
 export function errorHandler(error, req, res, next) {
+  if (res.headersSent) return next(error);
   const isDuplicate = error?.code === 11000;
   const isMongooseValidation = error?.name === 'ValidationError';
   const isCastError = error?.name === 'CastError';
@@ -36,7 +39,9 @@ export function errorHandler(error, req, res, next) {
 
   if (statusCode >= 500) {
     console.error(error);
+    if (process.env.SENTRY_DSN) Sentry.captureException(error, { extra: { requestId: req.id, path: req.originalUrl, method: req.method } });
   }
 
+  response.meta = { requestId: req.id, timestamp: new Date().toISOString() };
   return res.status(statusCode).json(response);
 }

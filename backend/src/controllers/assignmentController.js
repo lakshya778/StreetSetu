@@ -4,10 +4,17 @@ import {
   reassignComplaint,
   updateAssignedStatus
 } from '../services/assignmentService.js';
+import { recommendVolunteers } from '../services/assignmentRecommendationService.js';
 
 export async function assign(req, res, next) {
   try {
-    return res.status(201).json({ success: true, data: await assignComplaint(req.params.complaintId, req.body.volunteerId, req), message: 'Complaint assigned successfully' });
+    return res.status(201).json({ success: true, data: await assignComplaint(req.params.complaintId, req.body.volunteerId, req, { recommendationAccepted: req.body.recommendationAccepted }), message: 'Complaint assigned successfully' });
+  } catch (error) { return next(error); }
+}
+
+export async function recommendations(req, res, next) {
+  try {
+    return res.json({ success: true, data: await recommendVolunteers(req.params.complaintId), message: 'Volunteer recommendations generated successfully' });
   } catch (error) { return next(error); }
 }
 

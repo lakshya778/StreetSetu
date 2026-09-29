@@ -54,6 +54,6 @@ export async function unvote(req, res, next) {
 }
 
 export async function map(req, res, next) {
-  try { return res.json({ success: true, data: await listMapComplaints() }); }
+  try { return res.json({ success: true, data: await listMapComplaints(req.query, req) }); }
   catch (error) { return next(error); }
 }

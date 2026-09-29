@@ -49,20 +49,59 @@ export async function getDashboardSummary(query, req) {
   resolvedComplaints,
   rejectedComplaints,
   categoryCounts,
+  topRejectionCategories,
+  statusCounts,
+  monthlyTrends,
+  resolutionTrends,
   wardStatistics,
   volunteerGroups
 ] = await Promise.all([
     Complaint.countDocuments(match),
     Complaint.countDocuments({ ...match, status: { $in: OPEN_STATUSES } }),
     Complaint.countDocuments({ ...match, status: { $in: RESOLVED_STATUSES } }),
-    Complaint.countDocuments({...match,
-      status: { $in: REJECTED_STATUSES }
-      }),
+    Complaint.countDocuments({ ...match, status: { $in: REJECTED_STATUSES } }),
     Complaint.aggregate([
       { $match: match },
       { $group: { _id: '$category', count: { $sum: 1 } } },
       { $sort: { count: -1, _id: 1 } },
       { $project: { _id: 0, category: '$_id', count: 1 } }
+    ]),
+    Complaint.aggregate([
+      { $match: { ...match, status: { $in: REJECTED_STATUSES } } },
+      { $group: { _id: '$category', count: { $sum: 1 } } },
+      { $sort: { count: -1, _id: 1 } },
+      { $limit: 5 },
+      { $project: { _id: 0, category: '$_id', count: 1 } }
+    ]),
+    Complaint.aggregate([
+      { $match: match },
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+      { $sort: { count: -1, _id: 1 } },
+      { $project: { _id: 0, status: '$_id', count: 1 } }
+    ]),
+    Complaint.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
+          submitted: { $sum: 1 },
+          resolved: { $sum: { $cond: [{ $in: ['$status', RESOLVED_STATUSES] }, 1, 0] } },
+          rejected: { $sum: { $cond: [{ $in: ['$status', REJECTED_STATUSES] }, 1, 0] } }
+        }
+      },
+      { $sort: { _id: 1 } },
+      { $project: { _id: 0, month: '$_id', submitted: 1, resolved: 1, rejected: 1 } }
+    ]),
+    Complaint.aggregate([
+      { $match: { ...match, resolvedAt: { $ne: null } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m', date: '$resolvedAt' } },
+          resolved: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } },
+      { $project: { _id: 0, month: '$_id', resolved: 1 } }
     ]),
     Complaint.aggregate([
       { $match: match },
@@ -139,7 +178,12 @@ export async function getDashboardSummary(query, req) {
     openComplaints,
     resolvedComplaints,
     rejectedComplaints,
+    rejectionRate: calculateRate(rejectedComplaints, totalComplaints),
     categoryCounts,
+    topRejectionCategories,
+    statusCounts,
+    monthlyTrends,
+    resolutionTrends,
     wardStatistics: wardStats,
     volunteerPerformance,
     filters: {

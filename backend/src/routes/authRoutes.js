@@ -1,10 +1,13 @@
 import { Router } from 'express';
-import { login, register } from '../controllers/authController.js';
+import { login, logout, refresh, register } from '../controllers/authController.js';
 import { validateLogin, validateRegister } from '../validators/authValidator.js';
+import { authRateLimit } from '../middleware/rateLimits.js';
 
 const router = Router();
 
-router.post('/register', validateRegister, register);
-router.post('/login', validateLogin, login);
+router.post('/register', authRateLimit, validateRegister, register);
+router.post('/login', authRateLimit, validateLogin, login);
+router.post('/refresh', authRateLimit, refresh);
+router.post('/logout', logout);
 
 export default router;

@@ -22,7 +22,17 @@ function validateVolunteerId(req, res, next) {
 }
 
 export function validateAssignment(req, res, next) {
-  return validateVolunteerId(req, res, next);
+  const recommendationAccepted = req.body?.recommendationAccepted ?? false;
+  if (typeof recommendationAccepted !== 'boolean') {
+    return next(validationError([{ field: 'recommendationAccepted', message: 'Recommendation acceptance must be a boolean' }]));
+  }
+  const errorCount = [];
+  if (!validId(req.body?.volunteerId)) {
+    errorCount.push({ field: 'volunteerId', message: 'A valid volunteer id is required' });
+  }
+  if (errorCount.length) return next(validationError(errorCount));
+  req.body = { volunteerId: req.body.volunteerId, recommendationAccepted };
+  return next();
 }
 
 export function validateReassignment(req, res, next) {

@@ -2,6 +2,7 @@ import nodemailer from 'nodemailer';
 import mongoose from 'mongoose';
 import Notification from '../models/Notification.js';
 import User from '../models/User.js';
+import { emitToUser } from './realtimeService.js';
 
 let transporter;
 
@@ -35,7 +36,7 @@ async function notifyRecipients({ complaint, recipientIds, title, message, metad
 }
 
 async function createInAppNotification(recipient, complaint, title, message, metadata) {
-  return Notification.create({
+  const notification = await Notification.create({
     recipient,
     complaint: complaint._id,
     type: 'in_app',
@@ -119,6 +120,18 @@ export async function notifyVolunteerAssigned({ complaint, volunteerId, reassign
       : `Complaint "${complaint.title}" has been assigned to you.`,
     metadata: { eventType: reassigned ? 'reassigned' : 'assigned', status: 'assigned' }
   });
+  const creatorId = String(complaint.createdBy?._id || complaint.createdBy);
+  if (creatorId !== String(volunteerId)) {
+    await notifyRecipients({
+      complaint,
+      recipientIds: [creatorId],
+      title: reassigned ? 'Complaint reassigned' : 'Complaint assigned',
+      message: reassigned
+        ? `A new volunteer has been assigned to your complaint "${complaint.title}".`
+        : `Your complaint "${complaint.title}" has been assigned to a volunteer.`,
+      metadata: { eventType: reassigned ? 'reassigned' : 'assigned', status: 'assigned' }
+    });
+  }
 }
 
 export async function notifyComplaintResolved({ complaint, previousStatus, note }) {
@@ -136,13 +149,18 @@ export async function notifyComplaintResolved({ complaint, previousStatus, note 
   });
 }
 
-export async function listNotifications({ page, limit, complaintId, unread }, req) {
+export async function listNotifications({ page, limit, complaintId, unread, search, eventType }, req) {
   const filter = {
     recipient: new mongoose.Types.ObjectId(req.user.sub),
     type: 'in_app'
   };
   if (complaintId) filter.complaint = new mongoose.Types.ObjectId(complaintId);
   if (unread) filter.status = { $ne: 'read' };
+  if (eventType) filter['metadata.eventType'] = eventType;
+  if (search) {
+    const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    filter.$or = [{ title: { $regex: escaped, $options: 'i' } }, { message: { $regex: escaped, $options: 'i' } }];
+  }
 
   const [items, total] = await Promise.all([
     Notification.find(filter)
@@ -174,4 +192,49 @@ export async function markNotificationRead(id, req) {
     throw error;
   }
   return notification;
+}
+
+export async function notifyComplaintRejected({ complaint, previousStatus, reason }) {
+  const recipientIds = [String(complaint.createdBy?._id || complaint.createdBy)];
+  const assignedUserId = complaint.assignedVolunteer?._id || complaint.assignedVolunteer
+    || complaint.assignedTo?._id || complaint.assignedTo;
+  if (assignedUserId && String(assignedUserId) !== recipientIds[0]) {
+    recipientIds.push(String(assignedUserId));
+  }
+  await notifyRecipients({
+    complaint,
+    recipientIds,
+    title: 'Complaint rejected',
+    message: `Your complaint "${complaint.title}" was rejected. Reason: ${reason}`,
+    metadata: { eventType: 'rejected', previousStatus, status: 'rejected', reason }
+  });
+  emitToUser(recipient, 'notification:new', notification.toObject());
+  return notification;
+}
+
+export async function notifyComplaintImagesUploaded({ complaint, uploaderId, count, stage = 'complaint' }) {
+  const recipientIds = new Set([String(complaint.createdBy?._id || complaint.createdBy)]);
+  const assigneeId = complaint.assignedVolunteer?._id || complaint.assignedVolunteer
+    || complaint.assignedTo?._id || complaint.assignedTo;
+  if (assigneeId) recipientIds.add(String(assigneeId));
+  if (uploaderId) recipientIds.add(String(uploaderId));
+  const stageLabel = stage === 'before' ? 'work-start' : stage === 'after' ? 'completion' : 'complaint';
+  await notifyRecipients({
+    complaint,
+    recipientIds: [...recipientIds],
+    title: 'Image uploaded',
+    message: `${count} ${count === 1 ? 'image was' : 'images were'} uploaded as ${stageLabel} evidence for "${complaint.title}".`,
+    metadata: { eventType: 'image_uploaded', stage, count }
+  });
+}
+
+export async function notifyRecommendationAccepted({ complaint, volunteerId, acceptedBy }) {
+  const recipientIds = [...new Set([String(volunteerId), String(acceptedBy)])];
+  await notifyRecipients({
+    complaint,
+    recipientIds,
+    title: 'Recommendation accepted',
+    message: `The recommended volunteer was assigned to "${complaint.title}".`,
+    metadata: { eventType: 'recommendation_accepted', volunteerId: String(volunteerId), acceptedBy: String(acceptedBy) }
+  });
 }

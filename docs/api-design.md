@@ -1,5 +1,58 @@
 # StreetSetu API Design Document
 
+## Production Release v1: sessions, live events, search, and reports
+
+All new routes use the existing `/api/v1` prefix and `{ success, data, message }` response envelope. Existing login/register `data.token` remains the access token; `data.accessToken` is an alias for newer clients. The refresh token is issued only as an HttpOnly cookie.
+
+### Refresh sessions
+
+- `POST /api/v1/auth/refresh`: reads the `streetsetu_refresh` HttpOnly cookie, revokes that refresh session, and rotates a new cookie and access token. Refresh sessions are hashed in `refreshsessions` and expire automatically.
+- `POST /api/v1/auth/logout`: revokes the current refresh session and clears the cookie. The access token remains valid until its normal expiration.
+- The cookie uses `Secure; SameSite=None` in production and is scoped to `/api/v1/auth`; configure the Vercel and Render services on a shared custom registrable domain for browser cookie compatibility.
+
+### Socket.IO events
+
+Socket.IO shares the Render API origin. Connect with `io(API_ORIGIN, { auth: { token: accessToken } })`; JWT authentication is required. Each connection joins its private `user:<id>` and `role:<role>` room. Authorized complaint parties may request a complaint room with `complaint:join` and a complaint ObjectId. Server events include `notification:new`, `dashboard:updated`, `complaint:created`, `complaint:assigned`, `complaint:reassigned`, `complaint:status`, and `complaint:rejected`. Complaint payloads contain identifiers and status metadata; clients should refetch protected details for current full records.
+
+### Search, pagination, and activity
+
+- `GET /api/v1/complaints`: supports existing `status`, `category`, `priority`, `assignedTo`, `page`, and `limit` filters, plus `search` (title/description/address) and ISO `from`/`to` dates. Limit is capped at 100.
+- `GET /api/v1/complaints/map`: supports the same filters and optional pagination. Calls without page/limit keep returning the legacy array response; paged calls return `{ items, page, limit, total, pages }`. Non-admin map results are owner/assignee scoped.
+- `GET /api/v1/notifications`: supports `page`, `limit`, `complaintId`, `unread`, `search`, and `eventType`.
+- `GET /api/v1/assignments/my-assignments`: retains page/limit pagination.
+- `GET /api/v1/dashboard/activity` (admin): paginated searchable audit records; optional filters are `actorId`, `action`, and `entityType`.
+
+### Reports
+
+- `GET /api/v1/dashboard/export.csv` (admin): downloads CSV complaint rows using status/category/priority/search/date filters. Spreadsheet formula-leading values are escaped.
+- `GET /api/v1/dashboard/export.pdf` (admin): downloads a PDF report with matching complaint status, category, priority, address, and rejection reason. PDF output is capped at 500 records per request; CSV output is capped at 5,000.
+
+### Operational security
+
+The API applies Helmet headers, strict production CORS allowlists with credentials, 1 MiB JSON/urlencoded body limits, request IDs, Morgan request logs, general and authentication rate limits, JWT algorithm pinning, and optional Sentry capture. Configure the trusted proxy hop count when deployed behind a proxy. Rate limiting uses process memory; use a shared store before running multiple API instances.
+
+## GEO, Media, and Smart Assignment (implemented API additions)
+
+Existing complaint endpoints and response envelopes remain unchanged. Complaint coordinates continue to be returned as `latitude` and `longitude`; the stored GeoJSON `location` remains available. Complaint documents now include `attachments`, `beforeImages`, `afterImages`, and `resolvedAt` where available.
+
+### Media upload
+
+- `POST /api/v1/uploads/images` (authenticated): multipart form field `images`, 1–5 JPG/JPEG/PNG/WebP files, at most 5 MiB each. Returns metadata records with `url`, `mimeType`, `fileName`, `size`, `storageKey`, and `uploadedAt`; pass these records in the existing complaint `attachments` field when creating a complaint.
+- `POST /api/v1/uploads/complaints/:complaintId/before-images` (assigned volunteer): multipart `images`; appends work-start evidence.
+- `POST /api/v1/uploads/complaints/:complaintId/after-images` (assigned volunteer): multipart `images`; appends completion evidence.
+
+Cloudinary configuration uses `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, and optional `CLOUDINARY_UPLOAD_FOLDER`. Volunteer status changes to `in_progress` and `resolved` require the corresponding evidence.
+
+### Volunteer profile and recommendations
+
+- `PATCH /api/v1/users/me/volunteer-profile` (volunteer): `{ "expertiseCategories": ["roads"], "location": { "latitude": 28.61, "longitude": 77.20 } }`. Both coordinates must be provided together; the API stores a GeoJSON Point.
+- `GET /api/v1/assignments/:complaintId/recommendations` (admin): returns volunteers ranked with `score`, `scoreBreakdown`, `activeComplaints`, `resolutionRate`, and `distanceKm`.
+- `POST /api/v1/assignments/:complaintId/assign` remains compatible with `{ "volunteerId": "ObjectId" }`; optional `{ "recommendationAccepted": true }` additionally records recommendation acceptance notification.
+
+### Dashboard analytics additions
+
+`GET /api/v1/dashboard/summary` retains existing fields and adds `statusCounts`, `monthlyTrends`, `resolutionTrends`, `topRejectionCategories`, and `volunteerPerformance`. The summary also includes rejected complaint counts and rejection rate.
+
 ## 1. API Architecture
 
 The StreetSetu API is the primary backend integration surface for civic issue reporting, user identity, workflows, department operations, work order management, GIS location services, AI classification, visibility dashboards, and notification workflows.
@@ -936,6 +989,37 @@ Authorization: Bearer <jwt_access_token>
   }
 }
 ```
+
+### 12.3 Implemented Complaint Rejection Analytics
+
+The implemented Express service mounts the versioned routes under `/api/v1` and exposes complaint status updates at `PATCH /api/v1/complaints/:id/status`. The following rejection contract applies to that endpoint:
+
+- Only an admin may set `status` to `rejected`.
+- The existing `note` field is the rejection reason for this status and must contain 1-1000 non-whitespace characters.
+- A complaint can move to rejected from `submitted` or `under_review`; rejected complaints are terminal.
+- A successful rejection stores `rejectedAt`, `rejectedBy`, and `rejectionReason` on the complaint.
+- Each status-history item records `previousStatus`, `status`, `changedBy`, and `changedAt`; the rejection reason is also recorded as the item's `note`.
+- The reporter and assigned volunteer receive in-app notifications; email notifications follow the existing notification configuration.
+
+Example request:
+
+```http
+PATCH /api/v1/complaints/65f123456789012345678901/status
+Authorization: Bearer <access-token>
+Content-Type: application/json
+
+{
+  "status": "rejected",
+  "note": "The report does not describe a civic service issue."
+}
+```
+
+The existing `GET /api/v1/dashboard/summary` response remains backward compatible. It retains the existing keys and adds:
+
+- `rejectionRate`: rejected complaints divided by all complaints in the requester's scope, as a percentage (0-100).
+- `topRejectionCategories`: up to five `{ "category": "...", "count": 0 }` entries, ordered by rejection count descending.
+
+Existing `rejectedComplaints` and volunteer `rejectedComplaints` / `resolutionRate` fields are retained. Volunteer resolution rate excludes rejected assignments from its denominator.
 
 ---
 

@@ -22,7 +22,10 @@ const attachmentSchema = new mongoose.Schema(
     mimeType: { type: String, required: true, trim: true },
     fileName: { type: String, trim: true },
     size: { type: Number, min: 0 },
-    storageKey: { type: String, trim: true }
+    storageKey: { type: String, trim: true },
+    uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    uploadedAt: { type: Date },
+    stage: { type: String, enum: ['complaint', 'before', 'after'], default: 'complaint' }
   },
   { _id: false }
 );
@@ -35,6 +38,7 @@ const statusHistorySchema = new mongoose.Schema(
       default: 'status_changed'
     },
     status: { type: String, enum: COMPLAINT_STATUSES, required: true },
+    previousStatus: { type: String, enum: COMPLAINT_STATUSES },
     changedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     assignedVolunteer: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     note: { type: String, trim: true, maxlength: 1000 },
@@ -82,9 +86,15 @@ const complaintSchema = new mongoose.Schema(
     },
     address: { type: String, trim: true, maxlength: 500 },
     attachments: { type: [attachmentSchema], default: [] },
+    beforeImages: { type: [attachmentSchema], default: [] },
+    afterImages: { type: [attachmentSchema], default: [] },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
     assignedVolunteer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
+    rejectedAt: { type: Date },
+    rejectedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    rejectionReason: { type: String, trim: true, maxlength: 1000 },
+    resolvedAt: { type: Date },
     verifiedByCitizen: { type: Boolean, default: false },
     verifiedAt: { type: Date },
     severityScore: { type: Number, default: 50, min: 0, max: 100 },
