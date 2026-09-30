@@ -9,17 +9,18 @@ const userSchema = new mongoose.Schema(
     role: { type: String, enum: ['citizen', 'volunteer', 'admin'], default: 'citizen' },
     expertiseCategories: { type: [{ type: String, enum: COMPLAINT_CATEGORIES }], default: [] },
     location: {
-      type: { type: String, enum: ['Point'], default: 'Point' },
-      coordinates: {
-        type: [Number],
-        validate: {
-          validator: (coordinates) => coordinates.length === 2
-            && coordinates[0] >= -180 && coordinates[0] <= 180
-            && coordinates[1] >= -90 && coordinates[1] <= 90,
-          message: 'Volunteer coordinates must be [longitude, latitude]'
+        type: { type: String, enum: ['Point'] },
+        coordinates: {
+          type: [Number],
+          default: undefined,
+          validate: {
+            validator: (coordinates) => coordinates.length === 2
+              && coordinates[0] >= -180 && coordinates[0] <= 180
+              && coordinates[1] >= -90 && coordinates[1] <= 90,
+            message: 'Volunteer coordinates must be [longitude, latitude]'
+          }
         }
-      }
-    },
+      },
     isActive: { type: Boolean, default: true }
   },
   { timestamps: true }
