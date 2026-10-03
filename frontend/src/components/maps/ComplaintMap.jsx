@@ -28,7 +28,7 @@ export default function ComplaintMap({ complaints = [], className = '' }) {
       <MarkerClusterGroup chunkedLoading>
         {points.map(({ complaint, position }) => <Marker key={complaint._id} position={position} icon={pinIcon}>
           <Popup>
-            <div className="map-popup-content"><strong>{complaint.title}</strong><span className="map-popup-status">{complaint.status?.replaceAll('_', ' ')}</span>
+            <div className="map-popup-content"><strong>{complaint.title}</strong>{complaint.address && <span className="map-popup-address">{complaint.address}</span>}<span className="map-popup-status">{complaint.status?.replaceAll('_', ' ')}</span>
               <ImageGallery images={(complaint.attachments || []).slice(0, 4)} label="Complaint photos" compact />
               <Link to={`/dashboard/complaints/${complaint._id}`}>View complaint</Link>
             </div>

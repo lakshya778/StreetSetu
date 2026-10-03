@@ -1,5 +1,6 @@
 import {
   createComplaint,
+  checkComplaintDuplicates,
   getComplaint,
   listCategories,
   listMapComplaints,
@@ -7,13 +8,22 @@ import {
   removeVote,
   verifyComplaint,
   voteForComplaint,
+  supportDuplicate,
+  listDuplicateComplaints,
+  mergeDuplicateComplaint,
   updateComplaintStatus
 } from '../services/complaintService.js';
+import { DUPLICATE_CONFIDENCE_THRESHOLD } from '../services/duplicateDetectionService.js';
 
 export async function create(req, res, next) {
   try {
     return res.status(201).json({ success: true, data: await createComplaint(req.body, req), message: 'Complaint created successfully' });
   } catch (error) { return next(error); }
+}
+
+export async function duplicateCheck(req, res, next) {
+  try { return res.json({ success: true, data: { threshold: DUPLICATE_CONFIDENCE_THRESHOLD * 100, candidates: await checkComplaintDuplicates(req.body) } }); }
+  catch (error) { return next(error); }
 }
 
 export async function list(req, res, next) {
@@ -50,6 +60,21 @@ export async function vote(req, res, next) {
 
 export async function unvote(req, res, next) {
   try { return res.json({ success: true, data: await removeVote(req.params.id, req), message: 'Vote removed successfully' }); }
+  catch (error) { return next(error); }
+}
+
+export async function supportDuplicateComplaint(req, res, next) {
+  try { return res.status(201).json({ success: true, data: await supportDuplicate(req.params.id, req), message: 'You are now supporting this complaint' }); }
+  catch (error) { return next(error); }
+}
+
+export async function duplicates(req, res, next) {
+  try { return res.json({ success: true, data: await listDuplicateComplaints() }); }
+  catch (error) { return next(error); }
+}
+
+export async function mergeDuplicate(req, res, next) {
+  try { return res.json({ success: true, data: await mergeDuplicateComplaint(req.params.id, req.body?.masterComplaintId, req), message: 'Duplicate complaint merged successfully' }); }
   catch (error) { return next(error); }
 }
 

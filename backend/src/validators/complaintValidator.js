@@ -101,7 +101,8 @@ export function validateCreateComplaint(req, res, next) {
     latitude: normalizedLocation.latitude,
     wardId: body.wardId,
     address: typeof body.address === 'string' ? body.address.trim() : undefined,
-    attachments: body.attachments || []
+    attachments: body.attachments || [],
+    allowDuplicate: body.allowDuplicate === true
   };
   return next();
 }

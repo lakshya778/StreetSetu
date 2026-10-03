@@ -6,6 +6,8 @@
 
 `auditlogs` stores actor, action, entity type/id, previous/new values, metadata, request ID, IP address, user agent, and timestamps. Indexes support created-time ordering, actor/action/entity filters, and request correlation. Complaint create, status, assignment, vote, and field-evidence operations write audit events while lifecycle history remains embedded in each complaint for backwards-compatible detail reads.
 
+Duplicate detection extends complaint records with optional `duplicateScore` (0–100), `duplicateOf` (canonical complaint ObjectId), `supporterCount`, `mergedAt`, and `mergedBy`; legacy `isDuplicate` and `masterComplaint` remain populated for older clients. Existing Vote rows are the source of current supporter counts. `duplicatesupports` records a unique `(complaint, user)` duplicate-prevention action and category for analytics.
+
 ## Production deployment notes
 
 MongoDB Atlas is the production operational database; set `MONGO_URI` to a least-privilege application user connection string with TLS and IP/network access restricted to the deployment. No relational schema or migration is added by Production Release v1. Atlas replica-set transactions can be introduced later if multi-document assignment/audit writes need atomicity.

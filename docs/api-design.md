@@ -53,6 +53,16 @@ Cloudinary configuration uses `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CL
 
 `GET /api/v1/dashboard/summary` retains existing fields and adds `statusCounts`, `monthlyTrends`, `resolutionTrends`, `topRejectionCategories`, and `volunteerPerformance`. The summary also includes rejected complaint counts and rejection rate.
 
+### Duplicate complaint detection
+
+- `POST /api/v1/complaints/duplicates/check` (authenticated citizen, volunteer, or admin): accepts the normal complaint title, description, category, and location payload. Returns `{ threshold, candidates }`; candidates include title, status, distance in meters, confidence as `similarityScore` (0–100), and supporter count. Detection compares category, normalized token overlap and title edit similarity, plus proximity within 300 meters. The default warning threshold is 62.
+- `POST /api/v1/complaints` remains backward compatible. On a detected duplicate, it returns `409 DUPLICATE_DETECTED` with the best candidate unless the caller explicitly sends `allowDuplicate: true` after user confirmation. Confirmed duplicates retain `duplicateScore`, `duplicateOf`, and the legacy `isDuplicate`/`masterComplaint` fields.
+- `POST /api/v1/complaints/:id/support-duplicate` (authenticated): idempotently adds the caller as a supporter and records a duplicate-prevention event. Returns `supporterCount`.
+- `GET /api/v1/complaints/duplicates` (admin): lists flagged and linked complaints with their canonical complaint, merge state, duplicate score, and current supporter count.
+- `POST /api/v1/complaints/:id/merge` (admin): accepts `{ "masterComplaintId": "ObjectId" }`, links the duplicate to the canonical complaint, and records merge actor/time.
+- The existing `POST`/`DELETE /api/v1/complaints/:id/vote` routes keep their contract and update the compatible `supporterCount` field. Complaint detail responses include both legacy `voteCount` and `supporterCount`.
+- Admin `GET /api/v1/dashboard/summary` retains all existing fields and adds `duplicateComplaints`, `mergedComplaints`, `duplicatesPrevented` (distinct reports citizens chose to support), `topDuplicateCategories`, and `duplicateSupportCount` (support actions).
+
 ## 1. API Architecture
 
 The StreetSetu API is the primary backend integration surface for civic issue reporting, user identity, workflows, department operations, work order management, GIS location services, AI classification, visibility dashboards, and notification workflows.

@@ -6,10 +6,12 @@ import RejectedComplaintsTable from '../components/complaints/RejectedComplaints
 import ComplaintMap from '../components/maps/ComplaintMap.jsx';
 import { useNotifications } from '../context/NotificationContext.jsx';
 import AuditActivityPanel from '../components/dashboard/AuditActivityPanel.jsx';
+import DuplicateComplaintsPanel from '../components/dashboard/DuplicateComplaintsPanel.jsx';
 
 const fallbackStats = {
   totalComplaints: 0, openComplaints: 0, resolvedComplaints: 0, rejectedComplaints: 0, rejectionRate: 0,
-  topRejectionCategories: [], categoryCounts: [], statusCounts: [], monthlyTrends: [], resolutionTrends: [], volunteerPerformance: []
+  topRejectionCategories: [], categoryCounts: [], statusCounts: [], monthlyTrends: [], resolutionTrends: [], volunteerPerformance: [],
+  duplicateComplaints: 0, mergedComplaints: 0, duplicatesPrevented: 0, topDuplicateCategories: [], duplicateSupportCount: 0
 };
 const STATUS_COLORS = ['#83a978', '#e4aa63', '#7fa8bd', '#9478a5', '#5e896b', '#ad665c', '#d27a70'];
 
@@ -52,6 +54,12 @@ export default function DashboardPage() {
     { label: 'Rejected', value: summary.rejectedComplaints, tone: 'red', mark: '×' },
     { label: 'Rejection rate', value: `${summary.rejectionRate}%`, tone: 'rose', mark: '%' }
   ];
+  if (user?.role === 'admin') cards.push(
+    { label: 'Duplicate reports', value: summary.duplicateComplaints, tone: 'amber', mark: '↔' },
+    { label: 'Merged reports', value: summary.mergedComplaints, tone: 'green', mark: '✓' },
+    { label: 'Duplicates prevented', value: summary.duplicatesPrevented, tone: 'ink', mark: '⌕' },
+    { label: 'Duplicate supporters', value: summary.duplicateSupportCount, tone: 'rose', mark: '♡' }
+  );
 
   return <div className="dashboard-page">
     <div className="page-heading"><div><p className="eyebrow">City operations</p><h1>Good morning, {user?.name?.split(' ')[0] || 'there'}.</h1><p className="page-lede">Here is the pulse of your neighbourhood today.</p></div>{user?.role === 'admin' && <div className="report-export-actions"><button className="outline-button" onClick={() => downloadReport('csv')}>Export CSV</button><button className="outline-button" onClick={() => downloadReport('pdf')}>Export PDF</button></div>}</div>
@@ -70,6 +78,7 @@ export default function DashboardPage() {
     </div>
     <section className="panel activity-panel"><div className="panel-heading"><div><p className="eyebrow">Volunteer performance</p><h2>Volunteer leaderboard</h2></div></div>{summary.volunteerPerformance.length ? <><div className="leaderboard-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={summary.volunteerPerformance.slice(0, 8)} layout="vertical" margin={{ left: 30 }}><CartesianGrid strokeDasharray="3 3" horizontal={false} /><XAxis type="number" allowDecimals={false} /><YAxis type="category" dataKey="volunteerName" width={100} /><Tooltip /><Bar dataKey="resolvedComplaints" name="Resolved" fill="#5e896b" radius={[0, 5, 5, 0]} /></BarChart></ResponsiveContainer></div><div className="table-wrap"><table><thead><tr><th>Volunteer</th><th>Assigned</th><th>Active</th><th>Resolved</th><th>Rejected</th><th>Resolution rate</th></tr></thead><tbody>{summary.volunteerPerformance.slice(0, 8).map((volunteer) => <tr key={String(volunteer.volunteerId)}><td>{volunteer.volunteerName || 'Volunteer'}</td><td>{volunteer.assignedComplaints}</td><td>{volunteer.openComplaints}</td><td>{volunteer.resolvedComplaints}</td><td><span className="rejection-badge small-rejection-badge">{volunteer.rejectedComplaints}</span></td><td><span className="rate-pill">{volunteer.resolutionRate}%</span></td></tr>)}</tbody></table></div></> : <div className="empty-table">Volunteer performance will populate as complaints are assigned.</div>}</section>
     {user?.role === 'admin' && <RejectedComplaintsTable />}
+    {user?.role === 'admin' && <DuplicateComplaintsPanel topCategories={summary.topDuplicateCategories} />}
     {user?.role === 'admin' && <AuditActivityPanel />}
   </div>;
 }

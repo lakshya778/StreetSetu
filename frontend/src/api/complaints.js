@@ -48,6 +48,26 @@ export async function uploadComplaintImages(files) {
   return data.data.attachments;
 }
 
+export async function checkComplaintDuplicates(payload) {
+  const { data } = await api.post('/complaints/duplicates/check', payload);
+  return data.data;
+}
+
+export async function supportDuplicateComplaint(id) {
+  const { data } = await api.post(`/complaints/${id}/support-duplicate`);
+  return data.data;
+}
+
+export async function getDuplicateComplaints() {
+  const { data } = await api.get('/complaints/duplicates');
+  return data.data;
+}
+
+export async function mergeDuplicateComplaint(id, masterComplaintId) {
+  const { data } = await api.post(`/complaints/${id}/merge`, { masterComplaintId });
+  return data.data;
+}
+
 export async function uploadWorkEvidence(complaintId, stage, files) {
   if (!['before', 'after'].includes(stage)) throw new Error('Evidence stage must be before or after');
   const formData = new FormData();

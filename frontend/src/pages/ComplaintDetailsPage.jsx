@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/client.js';
-import { getComplaint, updateComplaintStatus } from '../api/complaints.js';
+import { getComplaint, supportDuplicateComplaint, updateComplaintStatus } from '../api/complaints.js';
 import { statusLabel } from '../components/complaints/ComplaintCard.jsx';
 import ImageGallery from '../components/media/ImageGallery.jsx';
 import ComplaintMap from '../components/maps/ComplaintMap.jsx';
@@ -29,6 +29,7 @@ export default function ComplaintDetailsPage() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isSupporting, setIsSupporting] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -94,6 +95,16 @@ export default function ComplaintDetailsPage() {
     }
   }
 
+  async function handleSupport() {
+    setIsSupporting(true);
+    try {
+      const result = await supportDuplicateComplaint(id);
+      setComplaint((current) => ({ ...current, supporterCount: result.supporterCount }));
+    } catch (requestError) {
+      setError(getApiErrorMessage(requestError, 'Your support could not be added.'));
+    } finally { setIsSupporting(false); }
+  }
+
   if (isLoading) return <div className="loading-state">Loading complaint...</div>;
   if (!complaint) return <div className="notice-banner">{error || 'Complaint not found.'} <button onClick={() => navigate('/dashboard/complaints')}>Return to complaints</button></div>;
 
@@ -115,6 +126,7 @@ export default function ComplaintDetailsPage() {
       <div className="details-grid">
         <section className="panel detail-main">
           <div className="detail-tags"><span className={`priority-label priority-${complaint.priority}`}>{complaint.priority} priority</span><span className="category-tag">{complaint.category?.replaceAll('_', ' ')}</span></div>
+          <div className="supporter-summary"><strong>{complaint.supporterCount ?? complaint.voteCount ?? 0}</strong> people support this complaint <button type="button" className="outline-button" onClick={handleSupport} disabled={isSupporting}>{isSupporting ? 'Adding support…' : 'Support this complaint'}</button></div>
           <p className="detail-description">{complaint.description}</p>
           {complaint.status === 'rejected' && <div className="rejection-reason-box"><strong>Rejection reason</strong><p>{complaint.rejectionReason || history.find((event) => event.status === 'rejected')?.note || 'No reason was recorded for this historical rejection.'}</p>{complaint.rejectedAt && <small>Rejected {new Date(complaint.rejectedAt).toLocaleString('en-IN')}</small>}</div>}
           {complaint.address && <div className="location-block"><span>⌖</span><div><strong>{complaint.address}</strong><small>{complaint.latitude}, {complaint.longitude}</small></div></div>}

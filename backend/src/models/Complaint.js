@@ -100,6 +100,11 @@ const complaintSchema = new mongoose.Schema(
     severityScore: { type: Number, default: 50, min: 0, max: 100 },
     isDuplicate: { type: Boolean, default: false },
     masterComplaint: { type: mongoose.Schema.Types.ObjectId, ref: 'Complaint' },
+    duplicateScore: { type: Number, min: 0, max: 100, default: 0 },
+    duplicateOf: { type: mongoose.Schema.Types.ObjectId, ref: 'Complaint', index: true },
+    supporterCount: { type: Number, min: 0, default: 0 },
+    mergedAt: { type: Date },
+    mergedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     escalated: { type: Boolean, default: false, index: true },
     escalatedAt: { type: Date },
     statusHistory: { type: [statusHistorySchema], default: [] }

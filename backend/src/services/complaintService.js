@@ -5,6 +5,8 @@ import Complaint, {
 } from '../models/Complaint.js';
 import Assignment from '../models/Assignment.js';
 import Vote from '../models/Vote.js';
+import DuplicateSupport from '../models/DuplicateSupport.js';
+import { DUPLICATE_CONFIDENCE_THRESHOLD, findDuplicateCandidates } from './duplicateDetectionService.js';
 import { publishComplaintUpdate } from './realtimeService.js';
 import { recordAudit } from './auditService.js';
 import {
@@ -64,20 +66,28 @@ function ensureAccess(req, complaint) {
 
 export async function createComplaint(payload, req) {
   const creator = userId(req);
-  const nearbyDuplicate = await Complaint.findOne({
-    category: payload.category,
-    createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
-    location: { $geoWithin: { $centerSphere: [[payload.longitude, payload.latitude], 50 / 6378100] } }
-  }).select('_id');
+  const candidates = await findDuplicateCandidates(payload, { limit: 1 });
+  const bestCandidate = candidates[0];
+  if (bestCandidate && bestCandidate.confidence >= DUPLICATE_CONFIDENCE_THRESHOLD * 100 && !payload.allowDuplicate) {
+    const error = new ComplaintError('A similar complaint already exists nearby.', 409, 'DUPLICATE_DETECTED', {
+      candidate: { ...bestCandidate.complaint, distanceMeters: bestCandidate.distanceMeters, similarityScore: bestCandidate.confidence }
+    });
+    throw error;
+  }
+  const duplicateOf = bestCandidate && bestCandidate.confidence >= DUPLICATE_CONFIDENCE_THRESHOLD * 100 ? bestCandidate.complaint._id : undefined;
   const complaint = await Complaint.create({
     ...payload,
+    allowDuplicate: undefined,
     createdBy: creator,
-    isDuplicate: Boolean(nearbyDuplicate),
-    masterComplaint: nearbyDuplicate?._id,
+    isDuplicate: Boolean(duplicateOf),
+    masterComplaint: duplicateOf,
+    duplicateOf,
+    duplicateScore: duplicateOf ? bestCandidate.confidence : 0,
     statusHistory: [{ eventType: 'created', status: 'submitted', changedBy: creator, note: 'Complaint created' }]
   });
   const result = await Complaint.findById(complaint._id).populate('createdBy', 'name email role');
   result.voteCount = 0;
+  result.supporterCount = 0;
   await recordAudit({ req, actorId: creator, action: 'complaint.created', entityType: 'complaint', entityId: complaint._id, newValue: 'submitted', metadata: { category: complaint.category } });
   try {
     await notifyComplaintSubmitted({ complaint: result });
@@ -104,6 +114,7 @@ export async function getComplaint(id, req) {
     .populate('statusHistory.changedBy', 'name email role');
   ensureAccess(req, complaint);
   complaint.voteCount = await Vote.countDocuments({ complaint: complaint._id });
+  complaint.supporterCount = complaint.voteCount;
   return complaint;
 }
 
@@ -150,7 +161,7 @@ export async function listComplaints(query, req) {
     { $group: { _id: '$complaint', count: { $sum: 1 } } }
   ]);
   const countsByComplaint = new Map(voteCounts.map((item) => [String(item._id), item.count]));
-  items.forEach((item) => { item.voteCount = countsByComplaint.get(String(item._id)) || 0; });
+  items.forEach((item) => { item.voteCount = countsByComplaint.get(String(item._id)) || 0; item.supporterCount = item.voteCount; });
 
   return { items, page, limit, total, pages: Math.ceil(total / limit) };
 }
@@ -186,13 +197,77 @@ export async function verifyComplaint(id, req) {
   return complaint;
 }
 
+export async function checkComplaintDuplicates(payload) {
+  const candidates = await findDuplicateCandidates(payload);
+  return candidates.filter((candidate) => candidate.confidence >= DUPLICATE_CONFIDENCE_THRESHOLD * 100)
+    .map(({ complaint, ...score }) => ({
+      _id: complaint._id,
+      title: complaint.title,
+      status: complaint.status,
+      category: complaint.category,
+      address: complaint.address,
+      supporterCount: complaint.supporterCount || 0,
+      ...score
+    }));
+}
+
+export async function listDuplicateComplaints() {
+  const complaints = await Complaint.find({ $or: [{ duplicateOf: { $exists: true, $ne: null } }, { masterComplaint: { $exists: true, $ne: null } }, { isDuplicate: true }] })
+    .populate('duplicateOf', 'title status')
+    .populate('masterComplaint', 'title status')
+    .populate('mergedBy', 'name')
+    .sort({ createdAt: -1 }).limit(500).lean();
+  const supportTargets = complaints.map((item) => item.duplicateOf?._id || item.masterComplaint?._id || item._id);
+  const counts = await Vote.aggregate([
+    { $match: { complaint: { $in: supportTargets } } },
+    { $group: { _id: '$complaint', count: { $sum: 1 } } }
+  ]);
+  const countByComplaint = new Map(counts.map((item) => [String(item._id), item.count]));
+  return complaints.map((complaint) => {
+    const supportTarget = complaint.duplicateOf?._id || complaint.masterComplaint?._id || complaint._id;
+    return { ...complaint, supporterCount: countByComplaint.get(String(supportTarget)) || 0 };
+  });
+}
+
+export async function mergeDuplicateComplaint(id, masterId, req) {
+  const duplicateId = objectId(id, 'complaint id');
+  const canonicalId = objectId(masterId, 'master complaint id');
+  if (String(duplicateId) === String(canonicalId)) throw new ComplaintError('A complaint cannot be merged into itself', 400, 'VALIDATION_ERROR');
+  const [duplicate, master] = await Promise.all([Complaint.findById(duplicateId), Complaint.findById(canonicalId)]);
+  if (!duplicate || !master) throw new ComplaintError('Complaint not found', 404, 'NOT_FOUND');
+  duplicate.duplicateOf = master._id;
+  duplicate.masterComplaint = master._id;
+  duplicate.isDuplicate = true;
+  duplicate.mergedAt = new Date();
+  duplicate.mergedBy = userId(req);
+  await duplicate.save();
+  await recordAudit({ req, actorId: userId(req), action: 'complaint.duplicate_merged', entityType: 'complaint', entityId: duplicate._id, metadata: { duplicateOf: master._id } });
+  return duplicate;
+}
+
 export async function voteForComplaint(id, req) {
   const complaint = await Complaint.findById(objectId(id, 'complaint id'));
   if (!complaint) throw new ComplaintError('Complaint not found', 404, 'NOT_FOUND');
   try { await Vote.create({ complaint: complaint._id, user: userId(req) }); }
   catch (error) { if (error.code === 11000) throw new ComplaintError('You have already voted for this complaint', 409, 'CONFLICT'); throw error; }
   await recordAudit({ req, action: 'complaint.vote_added', entityType: 'complaint', entityId: complaint._id });
-  return { complaint: complaint._id, voteCount: await Vote.countDocuments({ complaint: complaint._id }) };
+  const voteCount = await Vote.countDocuments({ complaint: complaint._id });
+  await Complaint.updateOne({ _id: complaint._id }, { $set: { supporterCount: voteCount } });
+  return { complaint: complaint._id, voteCount, supporterCount: voteCount };
+}
+
+export async function supportDuplicate(id, req) {
+  const complaint = await Complaint.findById(objectId(id, 'complaint id'));
+  if (!complaint) throw new ComplaintError('Complaint not found', 404, 'NOT_FOUND');
+  const supporter = userId(req);
+  try { await Vote.create({ complaint: complaint._id, user: supporter }); }
+  catch (error) { if (error.code !== 11000) throw error; }
+  try { await DuplicateSupport.create({ complaint: complaint._id, user: supporter, category: complaint.category }); }
+  catch (error) { if (error.code !== 11000) throw error; }
+  const supporterCount = await Vote.countDocuments({ complaint: complaint._id });
+  await Complaint.updateOne({ _id: complaint._id }, { $set: { supporterCount } });
+  await recordAudit({ req, actorId: supporter, action: 'complaint.duplicate_supported', entityType: 'complaint', entityId: complaint._id });
+  return { complaint: complaint._id, supporterCount };
 }
 
 export async function removeVote(id, req) {
@@ -200,7 +275,9 @@ export async function removeVote(id, req) {
   const result = await Vote.findOneAndDelete({ complaint: complaintId, user: userId(req) });
   if (!result) throw new ComplaintError('Vote not found', 404, 'NOT_FOUND');
   await recordAudit({ req, action: 'complaint.vote_removed', entityType: 'complaint', entityId: complaintId });
-  return { complaint: complaintId, voteCount: await Vote.countDocuments({ complaint: complaintId }) };
+  const voteCount = await Vote.countDocuments({ complaint: complaintId });
+  await Complaint.updateOne({ _id: complaintId }, { $set: { supporterCount: voteCount } });
+  return { complaint: complaintId, voteCount, supporterCount: voteCount };
 }
 
 export async function listMapComplaints(query = {}, req) {

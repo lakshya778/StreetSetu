@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import Complaint from '../models/Complaint.js';
+import DuplicateSupport from '../models/DuplicateSupport.js';
 
 const OPEN_STATUSES = [
   'submitted',
@@ -54,7 +55,12 @@ export async function getDashboardSummary(query, req) {
   monthlyTrends,
   resolutionTrends,
   wardStatistics,
-  volunteerGroups
+  volunteerGroups,
+  duplicateComplaints,
+  mergedComplaints,
+  duplicatesPrevented,
+  topDuplicateCategories,
+  duplicateSupportCount
 ] = await Promise.all([
     Complaint.countDocuments(match),
     Complaint.countDocuments({ ...match, status: { $in: OPEN_STATUSES } }),
@@ -158,7 +164,12 @@ export async function getDashboardSummary(query, req) {
           rejectedComplaints: 1
         }
       }
-    ])
+    ]),
+    req.user.role === 'admin' ? Complaint.countDocuments({ $or: [{ duplicateOf: { $exists: true, $ne: null } }, { masterComplaint: { $exists: true, $ne: null } }, { isDuplicate: true }] }) : Promise.resolve(0),
+    req.user.role === 'admin' ? Complaint.countDocuments({ mergedAt: { $ne: null } }) : Promise.resolve(0),
+    req.user.role === 'admin' ? DuplicateSupport.distinct('complaint').then((items) => items.length) : Promise.resolve(0),
+    req.user.role === 'admin' ? DuplicateSupport.aggregate([{ $group: { _id: '$category', count: { $sum: 1 } } }, { $sort: { count: -1, _id: 1 } }, { $limit: 5 }, { $project: { _id: 0, category: '$_id', count: 1 } }]) : Promise.resolve([]),
+    req.user.role === 'admin' ? DuplicateSupport.countDocuments() : Promise.resolve(0)
   ]);
 
   const wardStats = wardStatistics.map((ward) => ({
@@ -186,6 +197,11 @@ export async function getDashboardSummary(query, req) {
     resolutionTrends,
     wardStatistics: wardStats,
     volunteerPerformance,
+    duplicateComplaints,
+    mergedComplaints,
+    duplicatesPrevented,
+    topDuplicateCategories,
+    duplicateSupportCount,
     filters: {
       wardId: query.wardId || null,
       from: query.fromDate?.toISOString() || null,
