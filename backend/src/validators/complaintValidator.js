@@ -87,6 +87,11 @@ export function validateCreateComplaint(req, res, next) {
   if (body.wardId !== undefined && (typeof body.wardId !== 'string' || !/^[a-f\d]{24}$/i.test(body.wardId))) {
     details.push({ field: 'wardId', message: 'Ward id must be a valid identifier' });
   }
+  for (const field of ['city', 'area']) {
+    if (body[field] !== undefined && (typeof body[field] !== 'string' || body[field].trim().length > (field === 'city' ? 120 : 160))) {
+      details.push({ field, message: `${field} must be a string within the allowed length` });
+    }
+  }
   const normalizedLocation = validateLocation(body, details);
   validateAttachments(body.attachments, details);
 
@@ -101,6 +106,8 @@ export function validateCreateComplaint(req, res, next) {
     latitude: normalizedLocation.latitude,
     wardId: body.wardId,
     address: typeof body.address === 'string' ? body.address.trim() : undefined,
+    city: typeof body.city === 'string' ? body.city.trim() : undefined,
+    area: typeof body.area === 'string' ? body.area.trim() : undefined,
     attachments: body.attachments || [],
     allowDuplicate: body.allowDuplicate === true
   };

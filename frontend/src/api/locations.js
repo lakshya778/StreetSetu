@@ -13,6 +13,14 @@ function formatAddress(result) {
   return result?.display_name || '';
 }
 
+function geographicParts(result) {
+  const parts = result?.address || {};
+  return {
+    city: parts.city || parts.town || parts.village || parts.municipality || parts.county || '',
+    area: parts.neighbourhood || parts.suburb || parts.quarter || parts.residential || parts.hamlet || parts.road || ''
+  };
+}
+
 export async function searchAddresses(query, { signal } = {}) {
   const params = new URLSearchParams({ q: query, format: 'jsonv2', addressdetails: '1', limit: '5' });
   const results = await requestNominatim(`/search?${params}`, signal);
@@ -20,6 +28,7 @@ export async function searchAddresses(query, { signal } = {}) {
     latitude: Number(result.lat),
     longitude: Number(result.lon),
     address: formatAddress(result),
+    ...geographicParts(result),
     id: result.place_id
   })).filter((result) => Number.isFinite(result.latitude) && Number.isFinite(result.longitude));
 }

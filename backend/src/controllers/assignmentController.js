@@ -5,6 +5,7 @@ import {
   updateAssignedStatus
 } from '../services/assignmentService.js';
 import { recommendVolunteers } from '../services/assignmentRecommendationService.js';
+import { getVolunteerRoute } from '../services/routeOptimizationService.js';
 
 export async function assign(req, res, next) {
   try {
@@ -15,6 +16,18 @@ export async function assign(req, res, next) {
 export async function recommendations(req, res, next) {
   try {
     return res.json({ success: true, data: await recommendVolunteers(req.params.complaintId), message: 'Volunteer recommendations generated successfully' });
+  } catch (error) { return next(error); }
+}
+
+export async function recommendTop(req, res, next) {
+  try {
+    return res.json({ success: true, data: await recommendVolunteers(req.params.complaintId, { limit: 5 }), message: 'Top volunteer recommendations generated successfully' });
+  } catch (error) { return next(error); }
+}
+
+export async function myRoute(req, res, next) {
+  try {
+    return res.json({ success: true, data: await getVolunteerRoute(req.user.sub), message: 'Today’s route optimized successfully' });
   } catch (error) { return next(error); }
 }
 

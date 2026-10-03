@@ -3,11 +3,13 @@ import { Link } from 'react-router-dom';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { getApiErrorMessage } from '../api/client.js';
 import api from '../api/client.js';
-import { getMyAssignments, updateAssignedComplaintStatus } from '../api/assignments.js';
+import { getMyAssignments, getMyOptimizedRoute, updateAssignedComplaintStatus } from '../api/assignments.js';
 import { uploadWorkEvidence } from '../api/complaints.js';
 import ImageGallery from '../components/media/ImageGallery.jsx';
 import ImageUploader from '../components/media/ImageUploader.jsx';
 import ComplaintMap from '../components/maps/ComplaintMap.jsx';
+import VolunteerRouteMap from '../components/maps/VolunteerRouteMap.jsx';
+import RouteSummaryCard from '../components/dashboard/RouteSummaryCard.jsx';
 import VolunteerProfileForm from '../components/layout/VolunteerProfileForm.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useNotifications } from '../context/NotificationContext.jsx';
@@ -27,6 +29,7 @@ export default function VolunteerDashboardPage() {
   const { user } = useAuth();
   const { socket } = useNotifications();
   const [assignments, setAssignments] = useState([]);
+  const [route, setRoute] = useState(null);
   const [assignmentMeta, setAssignmentMeta] = useState({ page: 1, pages: 1, total: 0 });
   const [assignmentSearch, setAssignmentSearch] = useState('');
   const [analytics, setAnalytics] = useState({ monthlyTrends: [], resolutionTrends: [], statusCounts: [] });
@@ -39,13 +42,15 @@ export default function VolunteerDashboardPage() {
     setError('');
     setIsLoading(true);
     try {
-      const [assignmentResult, dashboardResult] = await Promise.all([
+      const [assignmentResult, dashboardResult, routeResult] = await Promise.all([
         getMyAssignments({ page, limit: 100 }),
-        api.get('/dashboard/summary')
+        api.get('/dashboard/summary'),
+        getMyOptimizedRoute()
       ]);
       setAssignments(assignmentResult.items || []);
       setAssignmentMeta({ page: assignmentResult.page || page, pages: assignmentResult.pages || 1, total: assignmentResult.total || 0 });
       setAnalytics(dashboardResult.data.data || { monthlyTrends: [], resolutionTrends: [], statusCounts: [] });
+      setRoute(routeResult);
     } catch (requestError) {
       setError(getApiErrorMessage(requestError, 'Your dashboard could not be loaded.'));
     } finally { setIsLoading(false); }
@@ -55,15 +60,21 @@ export default function VolunteerDashboardPage() {
 
   useEffect(() => {
     if (!socket) return undefined;
-    socket.on('complaint:assigned', loadAssignments);
-    socket.on('complaint:reassigned', loadAssignments);
-    socket.on('complaint:status', loadAssignments);
+    const refreshAssignments = () => { void loadAssignments(); };
+    socket.on('complaint:assigned', refreshAssignments);
+    socket.on('complaint:reassigned', refreshAssignments);
+    socket.on('complaint:status', refreshAssignments);
     return () => {
-      socket.off('complaint:assigned', loadAssignments);
-      socket.off('complaint:reassigned', loadAssignments);
-      socket.off('complaint:status', loadAssignments);
+      socket.off('complaint:assigned', refreshAssignments);
+      socket.off('complaint:reassigned', refreshAssignments);
+      socket.off('complaint:status', refreshAssignments);
     };
   }, [socket, assignmentMeta.page]);
+
+  async function refreshRoute() {
+    try { setRoute(await getMyOptimizedRoute()); }
+    catch (requestError) { setError(getApiErrorMessage(requestError, 'The route could not be recalculated.')); }
+  }
 
   async function handleStatusChange(complaintId, status, stage, files) {
     setUpdatingId(complaintId);
@@ -91,16 +102,21 @@ export default function VolunteerDashboardPage() {
       inProgress,
       resolved,
       rejected,
-      rate: eligibleAssignments > 0 ? Math.round((resolved / eligibleAssignments) * 100) : 0
+      rate: eligibleAssignments > 0 ? Math.round((resolved / eligibleAssignments) * 100) : 0,
+      averageCompletionDays: analytics.averageCompletionDays,
+      routeEfficiencyScore: analytics.routeEfficiencyScore || 0,
+      rank: analytics.volunteerRank,
+      volunteerCount: analytics.volunteerPerformance?.length || 0
     };
   }, [analytics, assignments, assignmentMeta.total]);
 
   const metricCards = [
     { label: 'My assignments', value: metrics.total, description: 'All assigned complaints', tone: 'metric-dark' },
-    { label: 'In progress', value: metrics.inProgress, description: 'Currently being worked', tone: '' },
     { label: 'Resolved', value: metrics.resolved, description: 'Completed assignments', tone: '' },
-    { label: 'Rejected', value: metrics.rejected, description: 'Excluded from performance rate', tone: 'metric-red' },
-    { label: 'Resolution rate', value: `${metrics.rate}%`, description: 'Resolved / assignments excluding rejected', tone: 'metric-lime' }
+    { label: 'Average completion', value: metrics.averageCompletionDays == null ? '—' : `${metrics.averageCompletionDays} days`, description: 'Reported to resolved', tone: '' },
+    { label: 'Route efficiency', value: `${metrics.routeEfficiencyScore}%`, description: 'Completed complaints per km score', tone: '' },
+    { label: 'Resolution rate', value: `${metrics.rate}%`, description: 'Resolved / assignments excluding rejected', tone: 'metric-lime' },
+    { label: 'Volunteer ranking', value: metrics.rank ? `#${metrics.rank} / ${metrics.volunteerCount}` : '—', description: 'Ranked by resolution rate', tone: 'metric-dark' }
   ];
   const filteredAssignments = assignments.filter(({ complaint }) => !assignmentSearch || `${complaint?.title || ''} ${complaint?.description || ''} ${complaint?.category || ''} ${complaint?.address || ''}`.toLowerCase().includes(assignmentSearch.toLowerCase()));
   const assignedComplaints = filteredAssignments.map((assignment) => assignment.complaint).filter(Boolean);
@@ -109,7 +125,8 @@ export default function VolunteerDashboardPage() {
     <div className="page-heading"><div><p className="eyebrow">Volunteer workspace</p><h1>Good morning, {user?.name?.split(' ')[0] || 'volunteer'}.</h1><p className="page-lede">Your assigned street actions, in one clear view.</p></div><button className="outline-button" onClick={loadAssignments}>Refresh <span>↻</span></button></div>
     {error && <div className="notice-banner">{error}<button onClick={loadAssignments}>Retry</button></div>}
     <div className="volunteer-metrics">{metricCards.map((card) => <article className={`volunteer-metric ${card.tone}`} key={card.label}><span>{card.label}</span><strong>{isLoading ? '—' : card.value}</strong><small>{card.description}</small></article>)}</div>
-    <VolunteerProfileForm user={user} />
+    <VolunteerProfileForm user={user} onSaved={refreshRoute} />
+    <div className="volunteer-route-grid"><RouteSummaryCard route={route} isLoading={isLoading} /><VolunteerRouteMap route={route} /></div>
     <section className="panel volunteer-map-panel"><div className="panel-heading"><div><p className="eyebrow">Field coordination</p><h2>Assigned complaints nearby</h2></div></div><ComplaintMap complaints={assignedComplaints} className="volunteer-assignment-map" /></section>
     <div className="volunteer-charts-grid">
       <section className="panel"><div className="panel-heading"><div><p className="eyebrow">Personal performance</p><h2>Assigned complaint trend</h2></div></div><div className="dashboard-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={analytics.monthlyTrends || []}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="month" /><YAxis allowDecimals={false} /><Tooltip /><Legend /><Bar dataKey="submitted" name="Assigned reports" fill="#83a978" radius={[4, 4, 0, 0]} /><Bar dataKey="rejected" name="Rejected" fill="#d27a70" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></div></section>

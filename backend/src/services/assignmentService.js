@@ -5,6 +5,7 @@ import User from '../models/User.js';
 import { notifyRecommendationAccepted, notifyVolunteerAssigned } from './notificationService.js';
 import { publishComplaintUpdate, removeUserFromComplaintRoom } from './realtimeService.js';
 import { recordAudit } from './auditService.js';
+import { distanceInKm } from './assignmentRecommendationService.js';
 
 export class AssignmentError extends Error {
   constructor(message, statusCode = 400, code = 'ASSIGNMENT_ERROR') {
@@ -63,7 +64,8 @@ async function writeAssignment(complaint, volunteer, req, eventType, note) {
   const assignment = await Assignment.create({
     complaint: complaint._id,
     volunteer: volunteer._id,
-    assignedBy: new mongoose.Types.ObjectId(req.user.sub)
+    assignedBy: new mongoose.Types.ObjectId(req.user.sub),
+    distanceKm: distanceInKm(complaint.location?.coordinates, volunteer.location?.coordinates)
   });
   const previousStatus = complaint.status;
   complaint.assignedVolunteer = volunteer._id;
@@ -79,7 +81,7 @@ async function writeAssignment(complaint, volunteer, req, eventType, note) {
     changedAt: new Date()
   });
   await complaint.save();
-  await recordAudit({ req, action: `complaint.${eventType}`, entityType: 'complaint', entityId: complaint._id, previousValue, newValue: complaint.status, metadata: { assignedVolunteer: String(volunteer._id) } });
+  await recordAudit({ req, action: `complaint.${eventType}`, entityType: 'complaint', entityId: complaint._id, previousValue: previousStatus, newValue: complaint.status, metadata: { assignedVolunteer: String(volunteer._id) } });
   publishComplaintUpdate(complaint, eventType === 'reassigned' ? 'complaint:reassigned' : 'complaint:assigned');
 
   try {
@@ -171,7 +173,7 @@ export async function updateAssignedStatus(complaintId, { status, note }, req) {
     changedAt: new Date()
   });
   await complaint.save();
-  await recordAudit({ req, action: 'complaint.status_changed', entityType: 'complaint', entityId: complaint._id, previousValue, newValue: status, metadata: { note } });
+  await recordAudit({ req, action: 'complaint.status_changed', entityType: 'complaint', entityId: complaint._id, previousValue: previousStatus, newValue: status, metadata: { note } });
   publishComplaintUpdate(complaint, 'complaint:status');
   try {
     await notifyComplaintStatusChange({ complaint, previousStatus, status, note });

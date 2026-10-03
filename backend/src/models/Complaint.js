@@ -85,6 +85,8 @@ const complaintSchema = new mongoose.Schema(
       index: true
     },
     address: { type: String, trim: true, maxlength: 500 },
+    city: { type: String, trim: true, maxlength: 120, index: true },
+    area: { type: String, trim: true, maxlength: 160, index: true },
     attachments: { type: [attachmentSchema], default: [] },
     beforeImages: { type: [attachmentSchema], default: [] },
     afterImages: { type: [attachmentSchema], default: [] },
@@ -116,5 +118,8 @@ complaintSchema.index({ location: '2dsphere' });
 complaintSchema.index({ createdBy: 1, createdAt: -1 });
 complaintSchema.index({ status: 1, priority: 1, createdAt: -1 });
 complaintSchema.index({ wardId: 1, createdAt: -1 });
+complaintSchema.index({ category: 1, status: 1, createdAt: -1 });
+complaintSchema.index({ city: 1, area: 1, createdAt: -1 });
+complaintSchema.index({ area: 1, category: 1, status: 1, createdAt: -1 });
 
 export default mongoose.model('Complaint', complaintSchema);

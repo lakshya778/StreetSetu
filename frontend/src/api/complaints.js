@@ -48,6 +48,11 @@ export async function uploadComplaintImages(files) {
   return data.data.attachments;
 }
 
+export async function getNearbyComplaints({ latitude, longitude, radius = 1000, limit = 50 }) {
+  const { data } = await api.get('/complaints/nearby', { params: { latitude, longitude, radius, limit } });
+  return data.data;
+}
+
 export async function checkComplaintDuplicates(payload) {
   const { data } = await api.post('/complaints/duplicates/check', payload);
   return data.data;

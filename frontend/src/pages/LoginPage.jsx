@@ -49,7 +49,7 @@ export default function LoginPage() {
             {error && <div className="form-error" role="alert">{error}</div>}
             <button className="primary-button" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Signing in...' : 'Sign in'} <span>→</span></button>
           </form>
-          <p className="auth-switch">New to StreetSetu? <Link to="/register">Create an account</Link></p>
+          <p className="auth-switch">New to StreetSetu? <Link to="/register">Create an account</Link> · <Link to="/transparency">City transparency</Link></p>
         </div>
       </section>
     </main>

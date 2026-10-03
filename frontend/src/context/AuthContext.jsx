@@ -1,8 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import api from '../api/client.js';
+import { clearAccessToken, clearPrivateOfflineCache, setAccessToken, setCurrentUserId } from '../auth/accessTokenStore.js';
 
 const SESSION_KEY = 'streetsetu_session';
-const TOKEN_KEY = 'streetsetu_token';
 const AuthContext = createContext(null);
 
 function readSession() {
@@ -16,7 +16,8 @@ function readSession() {
 
 function saveSession(data) {
   localStorage.setItem(SESSION_KEY, JSON.stringify(data.user));
-  localStorage.setItem(TOKEN_KEY, data.token);
+  setCurrentUserId(data.user?._id);
+  setAccessToken(data.accessToken || data.token);
   return data.user;
 }
 
@@ -36,12 +37,14 @@ export function AuthProvider({ children }) {
   function logout() {
     api.post('/auth/logout').catch(() => {});
     localStorage.removeItem(SESSION_KEY);
-    localStorage.removeItem(TOKEN_KEY);
     setUser(null);
+    clearAccessToken();
+    setCurrentUserId(null);
+    clearPrivateOfflineCache();
   }
 
   useEffect(() => {
-    const handleExpired = () => setUser(null);
+    const handleExpired = () => { setUser(null); clearAccessToken(); setCurrentUserId(null); clearPrivateOfflineCache(); };
     window.addEventListener('streetsetu:session-expired', handleExpired);
     return () => window.removeEventListener('streetsetu:session-expired', handleExpired);
   }, []);

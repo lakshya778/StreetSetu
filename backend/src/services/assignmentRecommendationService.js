@@ -5,6 +5,8 @@ import User from '../models/User.js';
 
 const RESOLVED_STATUSES = ['resolved', 'closed'];
 const ACTIVE_STATUSES = ['submitted', 'under_review', 'assigned', 'in_progress'];
+const MAX_NEARBY_VOLUNTEERS = 200;
+const MAX_DISTANCE_KM = 50;
 const EARTH_RADIUS_KM = 6371;
 
 function recommendationError(message, statusCode, code) {
@@ -14,7 +16,7 @@ function recommendationError(message, statusCode, code) {
   return error;
 }
 
-function distanceInKm(from, to) {
+export function distanceInKm(from, to) {
   if (!from || !to) return null;
   const [fromLongitude, fromLatitude] = from;
   const [toLongitude, toLatitude] = to;
@@ -28,7 +30,37 @@ function distanceInKm(from, to) {
 
 function round(value) { return Math.round(value * 10) / 10; }
 
-export async function recommendVolunteers(complaintId) {
+function availabilityScore(availability) {
+  if (['available', 'full_time', 'flexible'].includes(availability)) return 100;
+  if (['limited', 'part_time', 'weekend'].includes(availability)) return 60;
+  if (availability === 'unavailable') return 0;
+  return 75;
+}
+
+async function nearbyVolunteers(complaintPoint) {
+  if (!complaintPoint) return User.find({ role: 'volunteer', isActive: true })
+    .select('name email phone area city availability expertiseCategories location').limit(MAX_NEARBY_VOLUNTEERS).lean();
+
+  const located = await User.aggregate([
+    {
+      $geoNear: {
+        near: { type: 'Point', coordinates: complaintPoint },
+        distanceField: 'distanceMeters',
+        spherical: true,
+        query: { role: 'volunteer', isActive: true }
+      }
+    },
+    { $limit: MAX_NEARBY_VOLUNTEERS },
+    { $project: { name: 1, email: 1, phone: 1, area: 1, city: 1, availability: 1, expertiseCategories: 1, location: 1, distanceMeters: 1 } }
+  ]);
+  const unlocated = located.length < MAX_NEARBY_VOLUNTEERS
+    ? await User.find({ role: 'volunteer', isActive: true, $or: [{ location: { $exists: false } }, { location: null }] })
+      .select('name email phone area city availability expertiseCategories location').limit(MAX_NEARBY_VOLUNTEERS - located.length).lean()
+    : [];
+  return [...located, ...unlocated];
+}
+
+export async function recommendVolunteers(complaintId, { limit } = {}) {
   if (!mongoose.isValidObjectId(complaintId)) {
     throw recommendationError('Complaint id must be valid', 400, 'VALIDATION_ERROR');
   }
@@ -38,9 +70,10 @@ export async function recommendVolunteers(complaintId) {
     throw recommendationError('Volunteer recommendations are available for complaints under review', 409, 'INVALID_STATUS');
   }
 
-  const volunteers = await User.find({ role: 'volunteer', isActive: true })
-    .select('name email expertiseCategories location')
-    .lean();
+  const complaintPoint = complaint.location?.coordinates || (Number.isFinite(complaint.longitude) && Number.isFinite(complaint.latitude)
+    ? [complaint.longitude, complaint.latitude]
+    : null);
+  const volunteers = await nearbyVolunteers(complaintPoint);
   if (!volunteers.length) return [];
 
   const performance = await Assignment.aggregate([
@@ -52,7 +85,7 @@ export async function recommendVolunteers(complaintId) {
         _id: '$volunteer',
         eligibleAssignments: { $sum: { $cond: [{ $ne: ['$complaint.status', 'rejected'] }, 1, 0] } },
         resolvedAssignments: { $sum: { $cond: [{ $in: ['$complaint.status', RESOLVED_STATUSES] }, 1, 0] } },
-        activeComplaints: {
+        activeAssignments: {
           $sum: {
             $cond: [
               { $and: [{ $eq: ['$isActive', true] }, { $in: ['$complaint.status', ACTIVE_STATUSES] }] },
@@ -65,44 +98,50 @@ export async function recommendVolunteers(complaintId) {
     }
   ]);
   const statsByVolunteer = new Map(performance.map((stats) => [String(stats._id), stats]));
-  const complaintPoint = complaint.location?.coordinates
-    || [complaint.longitude, complaint.latitude];
 
-  return volunteers.map((volunteer) => {
+  const recommendations = volunteers.map((volunteer) => {
     const stats = statsByVolunteer.get(String(volunteer._id)) || {};
-    const activeComplaints = stats.activeComplaints || 0;
+    const activeAssignments = stats.activeAssignments || 0;
     const eligibleAssignments = stats.eligibleAssignments || 0;
     const resolvedAssignments = stats.resolvedAssignments || 0;
-    const resolutionRate = eligibleAssignments
-      ? round((resolvedAssignments / eligibleAssignments) * 100)
-      : 50;
-    const expertiseCategories = volunteer.expertiseCategories || [];
-    const categoryExpertise = expertiseCategories.includes(complaint.category);
-    const distanceKm = distanceInKm(complaintPoint, volunteer.location?.coordinates);
-    const scoreParts = {
-      categoryExpertise: categoryExpertise ? 100 : expertiseCategories.length ? 0 : 20,
-      workload: Math.max(0, 100 - activeComplaints * 15),
+    const resolutionRate = eligibleAssignments ? round((resolvedAssignments / eligibleAssignments) * 100) : 50;
+    const distanceKm = Number.isFinite(volunteer.distanceMeters)
+      ? volunteer.distanceMeters / 1000
+      : distanceInKm(complaintPoint, volunteer.location?.coordinates);
+    const parts = {
+      distance: distanceKm === null ? 0 : Math.max(0, 100 * (1 - Math.min(distanceKm, MAX_DISTANCE_KM) / MAX_DISTANCE_KM)),
+      activeAssignments: Math.max(0, 100 - activeAssignments * 10),
       resolutionRate,
-      distance: distanceKm === null ? 50 : Math.max(0, 100 - Math.min(distanceKm, 100))
+      availability: availabilityScore(volunteer.availability)
     };
-    const score = round(
-      scoreParts.categoryExpertise * 0.4
-      + scoreParts.workload * 0.25
-      + scoreParts.resolutionRate * 0.2
-      + scoreParts.distance * 0.15
-    );
-
+    const score = round(parts.distance * 0.5 + parts.activeAssignments * 0.25 + parts.resolutionRate * 0.15 + parts.availability * 0.1);
+    const volunteerDetails = {
+      _id: volunteer._id,
+      name: volunteer.name,
+      email: volunteer.email,
+      phone: volunteer.phone || '',
+      area: volunteer.area || '',
+      city: volunteer.city || '',
+      availability: volunteer.availability || 'available'
+    };
     return {
+      volunteer: volunteerDetails,
       volunteerId: volunteer._id,
       name: volunteer.name,
       email: volunteer.email,
-      score,
+      phone: volunteer.phone || '',
+      area: volunteer.area || '',
+      city: volunteer.city || '',
+      availability: volunteer.availability || 'available',
+      distanceKm: distanceKm === null ? null : round(distanceKm),
+      activeAssignments,
+      activeComplaints: activeAssignments,
       assignedComplaints: eligibleAssignments,
-      scoreBreakdown: scoreParts,
-      expertiseCategories,
-      activeComplaints,
       resolutionRate,
-      distanceKm: distanceKm === null ? null : round(distanceKm)
+      score,
+      scoreBreakdown: parts,
+      expertiseCategories: volunteer.expertiseCategories || []
     };
-  }).sort((left, right) => right.score - left.score || left.activeComplaints - right.activeComplaints || left.name.localeCompare(right.name));
+  }).sort((left, right) => right.score - left.score || left.activeAssignments - right.activeAssignments || left.name.localeCompare(right.name));
+  return Number.isInteger(limit) ? recommendations.slice(0, limit) : recommendations;
 }

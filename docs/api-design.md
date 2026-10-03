@@ -4,6 +4,20 @@
 
 All new routes use the existing `/api/v1` prefix and `{ success, data, message }` response envelope. Existing login/register `data.token` remains the access token; `data.accessToken` is an alias for newer clients. The refresh token is issued only as an HttpOnly cookie.
 
+### Public transparency and complaint tracking
+
+- `GET /api/v1/public/transparency` (public): returns city-level totals for complaints, resolved/active/rejected counts, resolution rate, average resolution duration in days, top categories, most active areas, and a rounded geographic hotspot summary. No reporter identity, contact details, descriptions, or exact coordinates are returned.
+- `GET /api/v1/public/complaints/:complaintId` (public): validates the complaint id and returns title, category, current status, created/updated/resolved timestamps, assigned volunteer name, and status-only history. Actor IDs, contact details, and free-text internal notes are excluded.
+- The React pages are `/transparency` and `/track/:complaintId`; both work without a session.
+
+### Progressive web app and offline behavior
+
+The frontend serves `/manifest.json` and `/service-worker.js` over HTTPS (or localhost). The worker caches the app shell and static assets; the API client keeps network-first snapshots of dashboard summary, complaint lists, and notifications in user-specific Cache Storage entries. Logout clears private caches. Offline submissions and mutations are not queued; reconnect before reporting or updating a complaint. Increment the cache version when changing the shell/service-worker strategy.
+
+### Email delivery
+
+Nodemailer sends reusable HTML and text templates when SMTP is configured. Submission, assignment/reassignment, resolution, rejection, and volunteer assignment notifications use the existing notification service; failed deliveries are recorded in `notifications` without changing complaint transaction outcomes. Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, and `PUBLIC_APP_URL`. Tracking email links use the public `/track/:complaintId` page.
+
 ### Refresh sessions
 
 - `POST /api/v1/auth/refresh`: reads the `streetsetu_refresh` HttpOnly cookie, revokes that refresh session, and rotates a new cookie and access token. Refresh sessions are hashed in `refreshsessions` and expire automatically.
@@ -18,18 +32,25 @@ Socket.IO shares the Render API origin. Connect with `io(API_ORIGIN, { auth: { t
 
 - `GET /api/v1/complaints`: supports existing `status`, `category`, `priority`, `assignedTo`, `page`, and `limit` filters, plus `search` (title/description/address) and ISO `from`/`to` dates. Limit is capped at 100.
 - `GET /api/v1/complaints/map`: supports the same filters and optional pagination. Calls without page/limit keep returning the legacy array response; paged calls return `{ items, page, limit, total, pages }`. Non-admin map results are owner/assignee scoped.
+- `GET /api/v1/complaints/nearby?latitude=28.61&longitude=77.20&radius=1000`: authenticated citizen, volunteer, or admin public discovery within a radius in meters (the citizen UI offers 500, 1,000, and 5,000). Uses MongoDB `$geoNear` on complaint GeoJSON points and returns nearest-first `{ items, count, center, radiusMeters }`; each item includes `title`, `category`, `status`, `distanceMeters`, and `supportCount`. The older `/api/v1/geo/complaints/nearby` remains unchanged and scoped to a user’s own/assigned reports.
 - `GET /api/v1/notifications`: supports `page`, `limit`, `complaintId`, `unread`, `search`, and `eventType`.
 - `GET /api/v1/assignments/my-assignments`: retains page/limit pagination.
+- `GET /api/v1/assignments/my-route` (volunteer): returns active assignments created today (UTC), arranged by greedy nearest-neighbour order from the volunteer’s saved profile location. Includes `routeOrder`, per-leg Haversine `legDistanceKm`, `totalDistanceKm`, and `estimatedTravelMinutes` using a 4.5 km/h walking estimate. If the volunteer has no saved coordinates, the route starts with the first assigned complaint; legs with missing coordinates are omitted from distance totals.
 - `GET /api/v1/dashboard/activity` (admin): paginated searchable audit records; optional filters are `actorId`, `action`, and `entityType`.
 
 ### Reports
 
 - `GET /api/v1/dashboard/export.csv` (admin): downloads CSV complaint rows using status/category/priority/search/date filters. Spreadsheet formula-leading values are escaped.
 - `GET /api/v1/dashboard/export.pdf` (admin): downloads a PDF report with matching complaint status, category, priority, address, and rejection reason. PDF output is capped at 500 records per request; CSV output is capped at 5,000.
+- `GET /api/v1/dashboard/export/volunteers.csv` (admin): profile and assignment performance rows, capped at 5,000 volunteers.
+- `GET /api/v1/dashboard/export/analytics.csv` (admin): overview metrics, monthly trends, categories, and statuses; accepts dashboard date/ward filters.
+- `GET /api/v1/dashboard/export/monthly.pdf?month=YYYY-MM` (admin): selected-month totals, categories, and complaint activity.
+- `GET /api/v1/dashboard/export/admin.pdf` (admin): executive metrics, duplicate prevention, volunteer ranking, hotspot zones, and active areas.
+- `GET /api/v1/dashboard/export/volunteer.pdf?volunteerId=<ObjectId>` (admin): selected volunteer’s assignment history and completion summary.
 
 ### Operational security
 
-The API applies Helmet headers, strict production CORS allowlists with credentials, 1 MiB JSON/urlencoded body limits, request IDs, Morgan request logs, general and authentication rate limits, JWT algorithm pinning, and optional Sentry capture. Configure the trusted proxy hop count when deployed behind a proxy. Rate limiting uses process memory; use a shared store before running multiple API instances.
+The API applies Helmet headers, strict production CORS allowlists with credentials, 1 MiB JSON/urlencoded body limits, request IDs, Morgan request logs, general and authentication rate limits, JWT algorithm pinning, and optional Sentry capture. Access tokens are held in frontend memory; refresh tokens are HttpOnly cookies and hashed refresh sessions are single-use rotated. Socket.IO verifies JWTs against active user records, limits connections and room joins in-process, and authorizes complaint subscriptions. Configure the trusted proxy hop count when deployed behind a proxy. Rate and socket limits use process memory; use shared stores before running multiple API instances.
 
 ## GEO, Media, and Smart Assignment (implemented API additions)
 
@@ -45,13 +66,23 @@ Cloudinary configuration uses `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CL
 
 ### Volunteer profile and recommendations
 
-- `PATCH /api/v1/users/me/volunteer-profile` (volunteer): `{ "expertiseCategories": ["roads"], "location": { "latitude": 28.61, "longitude": 77.20 } }`. Both coordinates must be provided together; the API stores a GeoJSON Point.
-- `GET /api/v1/assignments/:complaintId/recommendations` (admin): returns volunteers ranked with `score`, `scoreBreakdown`, `activeComplaints`, `resolutionRate`, and `distanceKm`.
+- `PATCH /api/v1/users/me/volunteer-profile` (volunteer): accepts the existing `expertiseCategories` and `location` fields plus optional `phone`, `area`, `city`, and `availability` (`available|limited|unavailable|full_time|part_time|weekend|flexible`). Both coordinates must be provided together; the API stores a GeoJSON Point. Existing payloads remain valid.
+- `GET /api/v1/assignments/recommend/:complaintId` (admin): returns the top five eligible volunteers, each with a nested `volunteer` object, `distanceKm`, `activeAssignments`, `resolutionRate`, `score` (0–100), and `scoreBreakdown`. The score weights proximity 50%, active workload 25%, resolution rate 15%, and availability 10%. Distance score falls to zero at 50 km; unavailable volunteers score zero on availability and should not be auto-assigned.
+- `GET /api/v1/assignments/:complaintId/recommendations` (admin): backward-compatible full recommendation list with the same scoring fields and legacy aliases.
 - `POST /api/v1/assignments/:complaintId/assign` remains compatible with `{ "volunteerId": "ObjectId" }`; optional `{ "recommendationAccepted": true }` additionally records recommendation acceptance notification.
+- Admins may manually assign any eligible volunteer through the existing assignment endpoint or auto-assign the highest ranked available volunteer in the admin complaint workflow. Assignment records retain `distanceKm` when both complaint and volunteer coordinates are known.
 
 ### Dashboard analytics additions
 
-`GET /api/v1/dashboard/summary` retains existing fields and adds `statusCounts`, `monthlyTrends`, `resolutionTrends`, `topRejectionCategories`, and `volunteerPerformance`. The summary also includes rejected complaint counts and rejection rate.
+`GET /api/v1/dashboard/summary` retains existing fields and adds `statusCounts`, `monthlyTrends`, `resolutionTrends`, `topRejectionCategories`, and `volunteerPerformance`. The summary also includes rejected complaint counts and rejection rate, plus `averageResponseDistanceKm`, `averageTravelDistanceKm`, `volunteerWorkload`, `totalVolunteerWorkload`, `assignmentEfficiency`, `complaintsCompletedPerKm`, and `routeEfficiencyScore`. Average distance uses recorded volunteer-to-complaint assignment distances. Completed-per-kilometre uses resolved assignments divided by their recorded distance; route efficiency is capped at 100 and is ten times that rate. Legacy assignments without distance remain excluded from distance-based rates.
+
+### Geographic analytics
+
+The admin-only `/api/v1/analytics` routes accept ISO `from`/`to` date filters. The heatmap and geo-summary also accept `category` and `status`; heatmap accepts `kind=all|resolved|rejected`. Existing complaint responses and dashboard routes are unchanged.
+
+- `GET /api/v1/analytics/heatmap`: aggregation-backed zone points `{ latitude, longitude, count, intensity }`, total matching complaint `count`, and the 5,000-zone response cap. Every matching complaint contributes to its rounded coordinate zone; category/status/date filters narrow the heat layer.
+- `GET /api/v1/analytics/hotspots`: returns top ten coordinate zones, category hotspots, most reported/resolved/rejected areas, monthly hotspot trends, and `metrics`. A zone groups points rounded to three decimal places; an active hotspot has at least three open complaints. `heatmapScore` is capped at 100 and equals ten times the busiest active zone count (before cap).
+- `GET /api/v1/analytics/geo-summary`: returns aggregation counts by city, area, category, and status plus up to 500 active volunteers with saved coordinates in `volunteerCoverage`, for the admin coverage map. New complaint submissions may store optional `city` and `area`; older records derive labels from the comma-separated address when possible.
 
 ### Duplicate complaint detection
 

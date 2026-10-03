@@ -1,7 +1,7 @@
 import axios from 'axios';
+import { clearAccessToken, getAccessToken, getCurrentUserId, setAccessToken } from '../auth/accessTokenStore.js';
 
 const SESSION_KEY = 'streetsetu_session';
-const TOKEN_KEY = 'streetsetu_token';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1',
@@ -11,10 +11,42 @@ const api = axios.create({
   withCredentials: true
 });
 
+function offlineCacheKey(config) {
+  if (config.method?.toLowerCase() !== 'get') return null;
+  const userId = getCurrentUserId();
+  if (!userId) return null;
+  try {
+    const url = new URL(api.getUri(config));
+    if (!['/dashboard/summary', '/complaints', '/notifications'].includes(url.pathname.replace('/api/v1', ''))) return null;
+    url.searchParams.set('__streetsetu_user', userId);
+    return new Request(url.toString(), { method: 'GET', headers: { Accept: 'application/json' } });
+  } catch { return null; }
+}
+
+async function cacheApiResponse(response) {
+  const key = offlineCacheKey(response.config);
+  if (!key || typeof caches === 'undefined') return;
+  try {
+    const cache = await caches.open(`streetsetu-private-v1-${getCurrentUserId()}`);
+    await cache.put(key, new Response(JSON.stringify(response.data), { headers: { 'Content-Type': 'application/json' } }));
+  } catch { /* Offline support is best effort when storage is full or unavailable. */ }
+}
+
+async function readOfflineApiResponse(error) {
+  const key = offlineCacheKey(error.config || {});
+  if (!key || typeof caches === 'undefined') return null;
+  try {
+    const cache = await caches.open(`streetsetu-private-v1-${getCurrentUserId()}`);
+    const cached = await cache.match(key);
+    if (!cached) return null;
+    return { data: await cached.json(), status: 200, statusText: 'OK (offline cache)', headers: {}, config: error.config, request: error.request };
+  } catch { return null; }
+}
+
 let refreshRequest;
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('streetsetu_token');
+  const token = getAccessToken();
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
@@ -23,7 +55,11 @@ export function getApiErrorMessage(error, fallback = 'Something went wrong. Plea
   return error?.response?.data?.error?.message || error?.response?.data?.message || fallback;
 }
 
-api.interceptors.response.use((response) => response, async (error) => {
+api.interceptors.response.use(async (response) => { await cacheApiResponse(response); return response; }, async (error) => {
+  if (!error.response) {
+    const cached = await readOfflineApiResponse(error);
+    if (cached) return cached;
+  }
   const original = error.config;
   const isAuthRequest = /\/auth\/(login|register|refresh|logout)/.test(original?.url || '');
   if (error.response?.status !== 401 || !original || original._retry || isAuthRequest) throw error;
@@ -32,12 +68,12 @@ api.interceptors.response.use((response) => response, async (error) => {
     refreshRequest ||= axios.post(`${api.defaults.baseURL}/auth/refresh`, {}, { withCredentials: true });
     const { data } = await refreshRequest;
     const accessToken = data.data.accessToken || data.data.token;
-    localStorage.setItem(TOKEN_KEY, accessToken);
+    setAccessToken(accessToken);
     original.headers.Authorization = `Bearer ${accessToken}`;
     window.dispatchEvent(new CustomEvent('streetsetu:token-refreshed', { detail: { accessToken } }));
     return api(original);
   } catch (refreshError) {
-    localStorage.removeItem(TOKEN_KEY);
+    clearAccessToken();
     localStorage.removeItem(SESSION_KEY);
     window.dispatchEvent(new Event('streetsetu:session-expired'));
     throw refreshError;

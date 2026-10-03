@@ -1,4 +1,4 @@
-import { findNearbyComplaints } from '../services/geoService.js';
+import { discoverNearbyComplaints, findNearbyComplaints } from '../services/geoService.js';
 
 export async function nearbyComplaints(req, res, next) {
   try {
@@ -9,4 +9,10 @@ export async function nearbyComplaints(req, res, next) {
   } catch (error) {
     return next(error);
   }
+}
+
+export async function discoverNearby(req, res, next) {
+  try {
+    return res.json({ success: true, data: await discoverNearbyComplaints(req.geoQuery), message: 'Nearby complaints found' });
+  } catch (error) { return next(error); }
 }

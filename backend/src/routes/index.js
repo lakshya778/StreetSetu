@@ -8,12 +8,16 @@ import notificationRoutes from './notificationRoutes.js';
 import aiRoutes from './aiRoutes.js';
 import assignmentRoutes from './assignmentRoutes.js';
 import userRoutes from './userRoutes.js';
+import analyticsRoutes from './analyticsRoutes.js';
+import publicRoutes from './publicRoutes.js';
 
 const router = Router();
 
 router.get('/health', (req, res) => {
   res.json({ success: true, message: 'StreetSetu API is healthy' });
 });
+
+router.use('/public', publicRoutes);
 
 router.use('/auth', authRoutes);
 router.use('/complaints', complaintRoutes);
@@ -24,5 +28,6 @@ router.use('/notifications', notificationRoutes);
 router.use('/ai', aiRoutes);
 router.use('/assignments', assignmentRoutes);
 router.use('/users', userRoutes);
+router.use('/analytics', analyticsRoutes);
 
 export default router;

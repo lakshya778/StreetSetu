@@ -8,7 +8,6 @@ export default function LocationPicker({ latitude, longitude, address, onChange,
   const [searching, setSearching] = useState(false);
   const [locationError, setLocationError] = useState('');
   const requestId = useRef(0);
-  const hasLocation = latitude !== '' && longitude !== '' && Number.isFinite(Number(latitude)) && Number.isFinite(Number(longitude));
 
   useEffect(() => {
     const trimmed = query.trim();
@@ -28,11 +27,11 @@ export default function LocationPicker({ latitude, longitude, address, onChange,
     setLocationError('');
     setSuggestions([]);
     setQuery('');
-    if (knownAddress) { onChange({ ...coords, address: knownAddress }); return; }
+    if (knownAddress) { onChange({ ...coords, address: knownAddress, city: coords.city || '', area: coords.area || '' }); return; }
     onChange({ ...coords, address: '' });
     try {
       const resolvedAddress = await reverseGeocode(coords.latitude, coords.longitude);
-      if (requestId.current === currentRequest) onChange({ ...coords, address: resolvedAddress });
+      if (requestId.current === currentRequest) onChange({ ...coords, address: resolvedAddress, city: '', area: '' });
     } catch {
       if (requestId.current === currentRequest) setLocationError('We could not find an address for this point. Please search for an address or choose another spot.');
     }

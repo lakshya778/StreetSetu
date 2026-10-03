@@ -5,6 +5,7 @@ const assignmentSchema = new mongoose.Schema(
     complaint: { type: mongoose.Schema.Types.ObjectId, ref: 'Complaint', required: true, index: true },
     volunteer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    distanceKm: { type: Number, min: 0 },
     isActive: { type: Boolean, default: true, index: true },
     assignedAt: { type: Date, default: Date.now },
     endedAt: { type: Date },
@@ -15,5 +16,7 @@ const assignmentSchema = new mongoose.Schema(
 
 assignmentSchema.index({ complaint: 1, isActive: 1 }, { unique: true, partialFilterExpression: { isActive: true } });
 assignmentSchema.index({ volunteer: 1, isActive: 1, createdAt: -1 });
+assignmentSchema.index({ volunteer: 1, isActive: 1, assignedAt: 1 });
+assignmentSchema.index({ assignedAt: -1, distanceKm: 1 });
 
 export default mongoose.model('Assignment', assignmentSchema);

@@ -72,9 +72,25 @@ export default function AdminComplaintManagementPage() {
     } finally { setActiveAction(''); }
   }
 
+  async function handleAutoAssignment(complaint) {
+    setActiveAction(`auto-${complaint._id}`);
+    setError('');
+    try {
+      const ranked = await getVolunteerRecommendations(complaint._id);
+      setRecommendations((current) => ({ ...current, [complaint._id]: ranked }));
+      const bestAvailable = ranked.find((item) => item.availability !== 'unavailable');
+      if (!bestAvailable) { setError('No available volunteers were found for automatic assignment. Review the recommendations or assign manually.'); return; }
+      await assignComplaint(complaint._id, bestAvailable.volunteerId, { recommendationAccepted: true });
+      await loadComplaints();
+    } catch (requestError) {
+      setError(getApiErrorMessage(requestError, 'Automatic assignment could not be completed.'));
+    } finally { setActiveAction(''); }
+  }
+
   function renderAssignmentAction(complaint) {
     if (complaint.status === 'under_review') {
-      return <><div className="admin-assignment-action"><button disabled={activeAction === `recommend-${complaint._id}`} onClick={() => handleRecommendations(complaint)}>{activeAction === `recommend-${complaint._id}` ? 'Ranking...' : 'Recommend volunteer'}</button><input value={volunteerIds[complaint._id] || ''} onChange={(event) => updateVolunteerId(complaint._id, event.target.value)} placeholder="Volunteer ID" aria-label={`Volunteer ID for ${complaint.title}`} /><button disabled={activeAction === `assign-${complaint._id}`} onClick={() => handleAssignment(complaint, false)}>{activeAction === `assign-${complaint._id}` ? 'Saving...' : 'Assign volunteer'}</button></div>{recommendations[complaint._id]?.length > 0 && <div className="recommendation-list">{recommendations[complaint._id].map((item) => <div className="recommendation-row" key={item.volunteerId}><span><strong>{item.name}</strong><small>Score {item.score} · {item.activeComplaints} active · {item.distanceKm == null ? 'distance unknown' : `${item.distanceKm} km away`}</small></span><button disabled={activeAction === `accept-${complaint._id}`} onClick={() => acceptRecommendation(complaint, item.volunteerId)}>Assign</button></div>)}</div>}</>;
+      const isWorking = activeAction.endsWith(complaint._id);
+      return <><div className="admin-assignment-action"><button disabled={isWorking} onClick={() => handleRecommendations(complaint)}>{activeAction === `recommend-${complaint._id}` ? 'Ranking...' : 'Recommend volunteers'}</button><button disabled={isWorking} onClick={() => handleAutoAssignment(complaint)}>{activeAction === `auto-${complaint._id}` ? 'Assigning...' : 'Auto assign'}</button><input value={volunteerIds[complaint._id] || ''} onChange={(event) => updateVolunteerId(complaint._id, event.target.value)} placeholder="Volunteer ID" aria-label={`Volunteer ID for ${complaint.title}`} /><button disabled={isWorking} onClick={() => handleAssignment(complaint, false)}>{activeAction === `assign-${complaint._id}` ? 'Saving...' : 'Assign manually'}</button></div>{recommendations[complaint._id]?.length > 0 && <div className="recommendation-list">{recommendations[complaint._id].slice(0, 5).map((item) => <div className="recommendation-row" key={item.volunteerId}><span><strong>{item.volunteer?.name || item.name}</strong><small>{item.area || item.city || 'Work area not set'} · {item.availability} · Score {item.score} · {item.activeAssignments} active · {item.distanceKm == null ? 'distance unknown' : `${item.distanceKm} km away`} · {item.resolutionRate}% resolved</small></span><button disabled={isWorking || item.availability === 'unavailable'} onClick={() => acceptRecommendation(complaint, item.volunteerId)}>Assign</button></div>)}</div>}</>;
     }
     if (complaint.assignedVolunteer && ['assigned', 'in_progress'].includes(complaint.status)) {
       return <div className="admin-assignment-action"><input value={volunteerIds[complaint._id] || ''} onChange={(event) => updateVolunteerId(complaint._id, event.target.value)} placeholder="New volunteer ID" aria-label={`New volunteer ID for ${complaint.title}`} /><button disabled={activeAction === `reassign-${complaint._id}`} onClick={() => handleAssignment(complaint, true)}>{activeAction === `reassign-${complaint._id}` ? 'Saving...' : 'Reassign'}</button></div>;

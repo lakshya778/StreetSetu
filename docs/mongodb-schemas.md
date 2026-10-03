@@ -2,11 +2,17 @@
 
 ## Production sessions and audit additions
 
+The implemented Mongoose `notifications` record uses `recipient` and `complaint` ObjectId references, `type: in_app|email`, `status`, `title`, `message`, delivery metadata, `sentAt`, `readAt`, and `failureReason`. Email HTML is rendered at send time and is not stored. The broader reference schema later in this document describes the platform’s future extensible notification contract; the current model remains the operational source of truth.
+
 `refreshsessions` stores rotating refresh-session metadata. It stores a SHA-256 token hash, never the raw refresh token, and has a TTL index on `expiresAt`. Revocation is recorded in `revokedAt`; user, request IP, and user-agent metadata support session management and investigations.
 
 `auditlogs` stores actor, action, entity type/id, previous/new values, metadata, request ID, IP address, user agent, and timestamps. Indexes support created-time ordering, actor/action/entity filters, and request correlation. Complaint create, status, assignment, vote, and field-evidence operations write audit events while lifecycle history remains embedded in each complaint for backwards-compatible detail reads.
 
 Duplicate detection extends complaint records with optional `duplicateScore` (0–100), `duplicateOf` (canonical complaint ObjectId), `supporterCount`, `mergedAt`, and `mergedBy`; legacy `isDuplicate` and `masterComplaint` remain populated for older clients. Existing Vote rows are the source of current supporter counts. `duplicatesupports` records a unique `(complaint, user)` duplicate-prevention action and category for analytics.
+
+Geo analytics adds optional `city` and `area` strings to complaints. Existing `location` remains a GeoJSON Point and retains its `2dsphere` index. Compound `{ category, status, createdAt }`, `{ city, area, createdAt }`, and `{ area, category, status, createdAt }` indexes support common date/category/status and place rollups. Heatmap, hotspot, and geographic summary endpoints use MongoDB aggregation pipelines with bounded heatmap output; legacy city/area labels are derived from the address when structured values are absent.
+
+The final release adds no mandatory collection migration. Public transparency and tracking are read-only projections of `complaints`; precise complaint coordinates, reporter identity, and internal update notes are excluded from public responses. Monthly/admin/volunteer reports aggregate existing complaint, user, and assignment records. Email HTML/text is rendered from reusable templates and is not stored; delivery status and notification text continue to use the existing `notifications` collection. The PWA stores user-scoped offline API snapshots in browser Cache Storage, not MongoDB.
 
 ## Production deployment notes
 
@@ -28,7 +34,11 @@ The existing `complaints` collection retains its current shape and adds/uses the
 
 Images live in Cloudinary; MongoDB stores their URL, storage key, MIME type, size, name, uploader, timestamp, and workflow stage. Uploads accept JPG/JPEG/PNG/WebP up to 5 MiB, with at most 5 per request/stage. The `location` field has a `2dsphere` index.
 
-Volunteer `users` may also hold `expertiseCategories: [category]` and `location: { type: "Point", coordinates: [longitude, latitude] }` with a `2dsphere` index. Assignment recommendations are computed from this profile plus assignment history; no new collection is required.
+Volunteer `users` may also hold optional `phone`, `area`, `city`, `availability` (`available|limited|unavailable|full_time|part_time|weekend|flexible`), `expertiseCategories`, and `location: { type: "Point", coordinates: [longitude, latitude] }`. The location has both a standalone `2dsphere` index and a compound `{ role, isActive, location: "2dsphere" }` index for nearby active volunteer queries. Assignment recommendations combine proximity, active workload, resolution history, and availability; no new collection is required. `assignments.distanceKm` records distance at assignment time where coordinates are available.
+
+Nearby citizen discovery uses the existing `complaints.location` `2dsphere` index with `$geoNear`; support totals are aggregated from `votes`. Volunteer route optimization uses `users.location` as the route origin and complaint locations as stops. There is no route persistence: today’s active assignment set is read from `assignments` using `{ volunteer, isActive, assignedAt }`, then ordered in application code. `assignments.distanceKm` remains the assignment-time straight-line distance used for travel analytics; routes are recalculated on request.
+
+Volunteer route lookups use the compound assignment index `{ volunteer: 1, isActive: 1, assignedAt: 1 }`. Public status tracking selects only title/category/status/timestamps, assigned volunteer name, and status history projection; it does not populate reporter or actor documents. Dashboard performance, resolution duration, and report exports are aggregation/query-time results and are not duplicated into user records.
 
 Status changes continue to append to `complaints.statusHistory`, including actor, previous/new status, note, and `changedAt`. Rejection fields (`rejectionReason`, `rejectedAt`, `rejectedBy`) and the `notifications` collection support rejection workflows. No migration is needed because these are optional/defaulted document fields and existing APIs still accept older payloads.
 
@@ -140,6 +150,7 @@ Indexes:
 - index on `departmentId`
 - index on `status`
 - text index on `name`
+- `2dsphere` index on `location`; compound `{ role, isActive, location: "2dsphere" }` index for volunteer search
 
 Validation rules:
 
@@ -668,7 +679,7 @@ Fields:
   "_id": "ObjectId",
   "userId": { "type": "ObjectId", "ref": "users", "required": true },
   "skills": [{ "type": "string" }],
-  "availability": { "type": "string", "enum": ["full_time", "part_time", "weekend", "flexible"], "default": "flexible" },
+  "availability": { "type": "string", "enum": ["available", "limited", "unavailable", "full_time", "part_time", "weekend", "flexible"], "default": "available" },
   "neighbourhoodId": { "type": "ObjectId", "ref": "neighbourhoods", "default": null },
   "wardId": { "type": "ObjectId", "ref": "wards", "default": null },
   "verificationStatus": { "type": "string", "enum": ["pending", "verified", "rejected"], "default": "pending" },

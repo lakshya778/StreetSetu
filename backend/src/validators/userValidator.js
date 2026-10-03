@@ -16,6 +16,18 @@ export function validateVolunteerProfile(req, res, next) {
     || expertiseCategories.some((category) => !COMPLAINT_CATEGORIES.includes(category))) {
     details.push({ field: 'expertiseCategories', message: 'Choose valid complaint categories for your expertise' });
   }
+  const profileFields = {};
+  for (const [field, maxLength] of [['phone', 30], ['area', 160], ['city', 120]]) {
+    if (body[field] !== undefined) {
+      if (typeof body[field] !== 'string' || body[field].trim().length > maxLength) {
+        details.push({ field, message: `${field} must be a string within the allowed length` });
+      } else profileFields[field] = body[field].trim();
+    }
+  }
+  const allowedAvailability = ['available', 'limited', 'unavailable', 'full_time', 'part_time', 'weekend', 'flexible'];
+  if (body.availability !== undefined && !allowedAvailability.includes(body.availability)) {
+    details.push({ field: 'availability', message: `Availability must be one of: ${allowedAvailability.join(', ')}` });
+  } else if (body.availability !== undefined) profileFields.availability = body.availability;
 
   const hasLatitude = body.latitude !== undefined;
   const hasLongitude = body.longitude !== undefined;
@@ -30,6 +42,6 @@ export function validateVolunteerProfile(req, res, next) {
   }
 
   if (details.length) return next(validationError(details));
-  req.body = { expertiseCategories: [...new Set(expertiseCategories)], ...(location ? { location } : {}) };
+  req.body = { expertiseCategories: [...new Set(expertiseCategories)], ...profileFields, ...(location ? { location } : {}) };
   return next();
 }

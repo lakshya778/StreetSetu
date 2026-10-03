@@ -18,7 +18,7 @@ export function validateNearbyComplaints(req, res, next) {
   const details = [];
   const latitude = Number(req.query.latitude);
   const longitude = Number(req.query.longitude);
-  const radiusMeters = Number(req.query.radiusMeters || 5000);
+  const radiusMeters = Number(req.query.radius ?? req.query.radiusMeters ?? 5000);
   const limit = Number.parseInt(req.query.limit, 10) || 50;
 
   if (req.query.latitude === undefined || !Number.isFinite(latitude) || latitude < -90 || latitude > 90) {

@@ -16,7 +16,12 @@ export async function assignComplaint(complaintId, volunteerId, { recommendation
 }
 
 export async function getVolunteerRecommendations(complaintId) {
-  const { data } = await api.get(`/assignments/${complaintId}/recommendations`);
+  const { data } = await api.get(`/assignments/recommend/${complaintId}`);
+  return data.data;
+}
+
+export async function getMyOptimizedRoute() {
+  const { data } = await api.get('/assignments/my-route');
   return data.data;
 }
 

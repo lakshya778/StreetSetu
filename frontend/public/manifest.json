@@ -1,0 +1,15 @@
+{
+  "id": "/",
+  "name": "StreetSetu Civic Action",
+  "short_name": "StreetSetu",
+  "description": "Report civic issues and follow neighbourhood action.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f7f1",
+  "theme_color": "#183b34",
+  "icons": [
+    { "src": "/icons/streetsetu-192.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" },
+    { "src": "/icons/streetsetu-512.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

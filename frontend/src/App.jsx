@@ -12,12 +12,16 @@ const CreateComplaintPage = lazy(() => import('./pages/CreateComplaintPage.jsx')
 const ComplaintDetailsPage = lazy(() => import('./pages/ComplaintDetailsPage.jsx'));
 const NotificationPage = lazy(() => import('./pages/NotificationPage.jsx'));
 const ComplaintManagementHomePage = lazy(() => import('./pages/ComplaintManagementHomePage.jsx'));
+const TransparencyPage = lazy(() => import('./pages/TransparencyPage.jsx'));
+const PublicComplaintTrackingPage = lazy(() => import('./pages/PublicComplaintTrackingPage.jsx'));
 
 export default function App() {
   return (
     <Suspense fallback={<div className="loading-state">Loading StreetSetu...</div>}><Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/transparency" element={<TransparencyPage />} />
+      <Route path="/track/:complaintId" element={<PublicComplaintTrackingPage />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<DashboardLayout />}>
           <Route path="/dashboard" element={<DashboardHomePage />} />

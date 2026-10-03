@@ -5,8 +5,9 @@ import { checkComplaintDuplicates, classifyComplaint, complaintCategories, creat
 import ImageUploader from '../components/media/ImageUploader.jsx';
 import DuplicateWarningModal from '../components/complaints/DuplicateWarningModal.jsx';
 import LocationPicker from '../components/maps/LocationPicker.jsx';
+import NearbyComplaintsPanel from '../components/complaints/NearbyComplaintsPanel.jsx';
 
-const initialForm = { title: '', description: '', category: 'roads', priority: 'medium', latitude: '', longitude: '', address: '' };
+const initialForm = { title: '', description: '', category: 'roads', priority: 'medium', latitude: '', longitude: '', address: '', city: '', area: '' };
 
 export default function CreateComplaintPage() {
   const [form, setForm] = useState(initialForm);
@@ -20,8 +21,8 @@ export default function CreateComplaintPage() {
 
   function updateField(event) { setForm((current) => ({ ...current, [event.target.name]: event.target.value })); }
 
-  function updateLocation({ latitude, longitude, address }) {
-    setForm((current) => ({ ...current, latitude: latitude.toFixed(6), longitude: longitude.toFixed(6), address }));
+  function updateLocation({ latitude, longitude, address, city = '', area = '' }) {
+    setForm((current) => ({ ...current, latitude: latitude.toFixed(6), longitude: longitude.toFixed(6), address, city, area }));
   }
 
   async function handleSubmit(event) {
@@ -86,7 +87,7 @@ export default function CreateComplaintPage() {
     {classification && <section className="ai-prediction panel"><div><p className="eyebrow">AI triage suggestion</p><h2>Here is what the model sees.</h2><p className="ai-prediction-note">This recommendation is saved for human review and does not change your report automatically.</p></div><div className="ai-prediction-values"><div><span>Category</span><strong>{classification.category.replaceAll('_', ' ')}</strong></div><div><span>Priority</span><strong className={`prediction-${classification.priority}`}>{classification.priority}</strong></div><div><span>Confidence</span><strong>{Math.round(classification.confidence * 100)}%</strong></div></div><Link className="text-button" to={`/dashboard/complaints/${createdComplaint?._id}`}>Open complaint <span>→</span></Link></section>}
     <form className="complaint-form panel" onSubmit={handleSubmit}>
       <div className="form-section"><p className="form-section-title">The issue</p><label>Title<input name="title" value={form.title} onChange={updateField} placeholder="e.g. Street light out near the market" required minLength="5" maxLength="160" /></label><label>Description<textarea name="description" value={form.description} onChange={updateField} placeholder="Describe what is happening, where, and how it affects the neighbourhood." required minLength="10" maxLength="5000" rows="5" /></label><div className="form-row"><label>Category<select name="category" value={form.category} onChange={updateField}>{complaintCategories.map((category) => <option key={category} value={category}>{category.replaceAll('_', ' ')}</option>)}</select></label><label>Priority<select name="priority" value={form.priority} onChange={updateField}>{complaintPriorities.map((priority) => <option key={priority} value={priority}>{priority}</option>)}</select></label></div></div>
-      <div className="form-section"><div className="form-section-heading"><p className="form-section-title">Location</p><span>{form.latitude && form.longitude && form.address ? 'Location selected' : 'Required'}</span></div><LocationPicker latitude={form.latitude} longitude={form.longitude} address={form.address} onChange={updateLocation} disabled={isSubmitting || Boolean(createdComplaint)} /></div>
+      <div className="form-section"><div className="form-section-heading"><p className="form-section-title">Location</p><span>{form.latitude && form.longitude && form.address ? 'Location selected' : 'Required'}</span></div><LocationPicker latitude={form.latitude} longitude={form.longitude} address={form.address} onChange={updateLocation} disabled={isSubmitting || Boolean(createdComplaint)} /><NearbyComplaintsPanel latitude={form.latitude} longitude={form.longitude} /></div>
       <div className="form-section"><p className="form-section-title">Evidence</p><ImageUploader files={files} onChange={setFiles} disabled={isSubmitting || Boolean(createdComplaint)} label="Add complaint photos" /></div>
       {error && <div className="form-error" role="alert">{error}</div>}
       <div className="form-actions"><Link className="outline-button" to="/dashboard/complaints">Cancel</Link><button className="primary-button compact-button" type="submit" disabled={isSubmitting || createdComplaint}>{isSubmitting ? 'Submitting...' : createdComplaint ? 'Complaint submitted' : 'Submit complaint'} <span>→</span></button></div>

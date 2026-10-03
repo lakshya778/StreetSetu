@@ -1,4 +1,5 @@
 import Complaint, { COMPLAINT_CATEGORIES, COMPLAINT_PRIORITIES, COMPLAINT_STATUSES } from '../models/Complaint.js';
+import Vote from '../models/Vote.js';
 
 export async function findNearbyComplaints({ latitude, longitude, radiusMeters, limit }, req) {
   const filter = {
@@ -28,4 +29,32 @@ export async function findNearbyComplaints({ latitude, longitude, radiusMeters, 
     center: { latitude, longitude },
     radiusMeters
   };
+}
+
+export async function discoverNearbyComplaints({ latitude, longitude, radiusMeters, limit }) {
+  const items = await Complaint.aggregate([
+    {
+      $geoNear: {
+        near: { type: 'Point', coordinates: [longitude, latitude] },
+        key: 'location',
+        distanceField: 'distanceMeters',
+        maxDistance: radiusMeters,
+        spherical: true
+      }
+    },
+    { $sort: { distanceMeters: 1 } },
+    { $limit: limit },
+    { $project: { title: 1, category: 1, status: 1, address: 1, distanceMeters: 1 } },
+    {
+      $lookup: {
+        from: Vote.collection.name,
+        let: { complaintId: '$_id' },
+        pipeline: [{ $match: { $expr: { $eq: ['$complaint', '$$complaintId'] } } }, { $count: 'count' }],
+        as: 'support'
+      }
+    },
+    { $set: { supportCount: { $ifNull: [{ $arrayElemAt: ['$support.count', 0] }, 0] } } },
+    { $unset: 'support' }
+  ]);
+  return { items, count: items.length, center: { latitude, longitude }, radiusMeters };
 }

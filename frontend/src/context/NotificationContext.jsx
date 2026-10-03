@@ -3,6 +3,7 @@ import { io } from 'socket.io-client';
 import { getApiErrorMessage } from '../api/client.js';
 import { getNotifications, markNotificationRead as markNotificationReadRequest } from '../api/notifications.js';
 import { useAuth } from './AuthContext.jsx';
+import { getAccessToken } from '../auth/accessTokenStore.js';
 
 const REALTIME_URL = import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_API_URL?.replace(/\/api\/v1\/?$/, '') || 'http://localhost:5000';
 
@@ -52,28 +53,33 @@ export function NotificationProvider({ children }) {
 
   useEffect(() => {
     if (!user) { setSocket(null); return undefined; }
-    const token = localStorage.getItem('streetsetu_token');
-    const connection = io(REALTIME_URL, { auth: { token }, withCredentials: true, reconnection: true });
-    setSocket(connection);
-    connection.on('notification:new', (notification) => {
-      setNotifications((items) => [notification, ...items.filter((item) => item._id !== notification._id)].slice(0, 20));
-      setNotificationMeta((current) => ({ ...current, total: current.total + 1 }));
-      if (notification.status !== 'read') setUnreadCount((count) => count + 1);
-    });
-    const dispatchUpdate = (payload) => window.dispatchEvent(new CustomEvent('streetsetu:live-update', { detail: payload }));
-    connection.on('dashboard:updated', dispatchUpdate);
-    connection.on('complaint:assigned', dispatchUpdate);
-    connection.on('complaint:reassigned', dispatchUpdate);
-    connection.on('complaint:status', dispatchUpdate);
-    connection.on('complaint:rejected', dispatchUpdate);
-    function refreshSocketToken(event) {
+    let connection = null;
+    function connect(token) {
+      if (!token || connection) return;
+      connection = io(REALTIME_URL, { auth: { token }, withCredentials: true, reconnection: true });
+      setSocket(connection);
+      connection.on('notification:new', (notification) => {
+        setNotifications((items) => [notification, ...items.filter((item) => item._id !== notification._id)].slice(0, 20));
+        setNotificationMeta((current) => ({ ...current, total: current.total + 1 }));
+        if (notification.status !== 'read') setUnreadCount((count) => count + 1);
+      });
+      const dispatchUpdate = (payload) => window.dispatchEvent(new CustomEvent('streetsetu:live-update', { detail: payload }));
+      connection.on('dashboard:updated', dispatchUpdate);
+      connection.on('complaint:assigned', dispatchUpdate);
+      connection.on('complaint:reassigned', dispatchUpdate);
+      connection.on('complaint:status', dispatchUpdate);
+      connection.on('complaint:rejected', dispatchUpdate);
+    }
+    const refreshSocketToken = (event) => {
+      if (!connection) return connect(event.detail.accessToken);
       connection.auth = { token: event.detail.accessToken };
       connection.disconnect().connect();
-    }
+    };
+    connect(getAccessToken());
     window.addEventListener('streetsetu:token-refreshed', refreshSocketToken);
     return () => {
       window.removeEventListener('streetsetu:token-refreshed', refreshSocketToken);
-      connection.disconnect();
+      connection?.disconnect();
       setSocket(null);
     };
   }, [user?._id]);

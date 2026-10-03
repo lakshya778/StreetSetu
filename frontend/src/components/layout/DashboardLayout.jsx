@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { NotificationProvider, useNotifications } from '../../context/NotificationContext.jsx';
 import NotificationDropdown from '../notifications/NotificationDropdown.jsx';
+import InstallAppPrompt from './InstallAppPrompt.jsx';
 
 const baseNavigation = [
   { label: 'Overview', path: '/dashboard', icon: '◈' },
@@ -67,6 +68,7 @@ function DashboardFrame() {
           <button className="icon-button menu-button" onClick={() => setSidebarOpen(true)} aria-label="Open navigation">☰</button>
           <div className="breadcrumb"><span>StreetSetu</span><b>/</b><strong>Operations</strong></div>
           <div className="topbar-actions">
+            <InstallAppPrompt />
             <div className="notification-anchor"><button className="notification-button" onClick={() => setNotificationsOpen((open) => !open)} aria-label={`View notifications${unreadCount ? `, ${unreadCount} unread` : ''}`} aria-expanded={notificationsOpen}><span>◌</span>{unreadCount > 0 && <b className="notification-badge">{unreadCount > 99 ? '99+' : unreadCount}</b>}</button>{notificationsOpen && <NotificationDropdown onClose={() => setNotificationsOpen(false)} />}</div>
             <div className="user-chip">
               <div className="avatar">{user?.name?.slice(0, 1).toUpperCase() || 'U'}</div>

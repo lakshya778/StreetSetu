@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import Notification from '../models/Notification.js';
 import User from '../models/User.js';
 import { emitToUser } from './realtimeService.js';
+import { renderNotificationEmail } from './emailTemplates.js';
 
 let transporter;
 
@@ -14,6 +15,9 @@ function getTransporter() {
     host: process.env.SMTP_HOST,
     port: Number.parseInt(process.env.SMTP_PORT, 10) || 587,
     secure: process.env.SMTP_SECURE === 'true',
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASSWORD
@@ -46,6 +50,8 @@ async function createInAppNotification(recipient, complaint, title, message, met
     metadata,
     sentAt: new Date()
   });
+  emitToUser(recipient, 'notification:new', notification.toObject());
+  return notification;
 }
 
 async function createEmailNotification(recipient, complaint, title, message, metadata) {
@@ -68,11 +74,13 @@ async function createEmailNotification(recipient, complaint, title, message, met
   }
 
   try {
+    const email = renderNotificationEmail({ recipient, complaint, title, message, metadata });
     await mailTransporter.sendMail({
-      from: process.env.SMTP_FROM,
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
       to: recipient.email,
-      subject: title,
-      text: message
+      subject: email.subject,
+      text: email.text,
+      html: email.html
     });
     notification.status = 'sent';
     notification.sentAt = new Date();
@@ -208,8 +216,6 @@ export async function notifyComplaintRejected({ complaint, previousStatus, reaso
     message: `Your complaint "${complaint.title}" was rejected. Reason: ${reason}`,
     metadata: { eventType: 'rejected', previousStatus, status: 'rejected', reason }
   });
-  emitToUser(recipient, 'notification:new', notification.toObject());
-  return notification;
 }
 
 export async function notifyComplaintImagesUploaded({ complaint, uploaderId, count, stage = 'complaint' }) {
