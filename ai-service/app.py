@@ -139,6 +139,15 @@ def _authorized():
 app = Flask(__name__)
 
 
+# Model ko startup pe load karo (gunicorn --preload ke saath master process mein),
+# request ke time pe nahi. Isse pehli request ko load wait nahi karna padega.
+try:
+    get_classifier()
+    print("Classifier loaded at startup", flush=True)
+except Exception:
+    app.logger.exception("Classifier preload failed")
+
+
 @app.get("/health")
 def health():
     return jsonify({
@@ -214,7 +223,7 @@ def classify():
             )
         }
 
-        print("AI RESPONSE:", response)
+        print("AI RESPONSE:", response, flush=True)
 
         return jsonify(response)
 
@@ -230,6 +239,16 @@ def classify():
 
         return jsonify({
             "error": str(error)
+        }), 503
+
+    except Exception as error:
+        # Koi bhi unexpected error (model load, pickle, sklearn mismatch etc.)
+        app.logger.exception(
+            "Unexpected classification error"
+        )
+
+        return jsonify({
+            "error": f"Classifier unavailable: {error}"
         }), 503
 
 
