@@ -4,7 +4,7 @@
 
 Design a production-oriented AI service that supports civic issue classification, severity scoring, duplicate detection, and predictive hotspot analysis for complaint triage and city operations.
 
-This document is architecture and interface-only. No AI service implementation is generated yet.
+The repository implements complaint classification and the completion-evidence verification endpoints described below. The broader severity and predictive hotspot interfaces remain future architecture.
 
 ---
 
@@ -22,6 +22,7 @@ The AI service receives normalized complaint payloads from the API service and r
 2. Severity Scoring
 3. Duplicate Detection
 4. Predictive Hotspot Analysis
+5. Before/after work-image similarity, EXIF GPS and capture-time verification
 
 ---
 

@@ -19,12 +19,15 @@ Civic issues are often reported across disconnected channels, with limited locat
 - Complaint lifecycle with a reasoned rejection path and recorded status history.
 - Admin assignment, reassignment, and ranked volunteer recommendations.
 - Volunteer work-start and completion evidence uploads.
+- Asynchronous CLIP completion verification with EXIF GPS/time checks and an admin evidence review queue.
 - In-app notifications, optional email delivery, and Socket.IO updates.
 - Complaint maps, nearby issue lookup, and dashboard analytics.
 - Citizen nearby complaint discovery before submission with 500 m, 1 km, and 5 km search radii.
 - Volunteer daily route planning with greedy nearest-neighbour ordering, distance/time estimates, and a Leaflet route map.
 - Installable PWA with offline access to previously loaded dashboard, complaint, and notification data.
 - Public transparency metrics and shareable no-login complaint tracking links.
+- Citizen volunteer ratings after resolution, weighted volunteer leaderboard, and assignment accept/decline tracking.
+- Fullscreen before/after evidence viewer with keyboard navigation and zoom.
 - Audit activity, CSV export, and PDF reports for administrators.
 - AI-assisted complaint classification through a separate Python service.
 
@@ -38,6 +41,7 @@ Civic issues are often reported across disconnected channels, with limited locat
 | Volunteer assignment | Admin assignment/reassignment and volunteer assignment list/status updates. |
 | Smart recommendations | Top-five volunteer recommendations weighted by proximity (50%), active workload (25%), resolution rate (15%), and availability (10%). Admins can review, assign manually, or auto-assign the highest-ranked available volunteer. |
 | Work evidence and images | Cloudinary-backed image upload configuration; complaint images and before/after work evidence are stored as attachment metadata. The configured defaults allow up to five files of 5 MiB each. |
+| Completion verification | Python AI service compares before/after OpenAI CLIP embeddings, checks image GPS against the complaint within 200 m, validates EXIF timestamp order, persists a fraud score, and blocks volunteer resolution until verified or approved by an admin. |
 | Location support | GeoJSON point coordinates, Leaflet/OpenStreetMap maps, map complaint listing, and nearby complaint lookup. |
 | Notifications | In-app and reusable HTML/text SMTP email updates for submission, assignment, resolution, rejection, and volunteer assignment; Socket.IO sends live in-app updates. |
 | Real-time updates | Socket.IO with JWT authentication, user/role rooms, authorized complaint subscriptions, and complaint/dashboard update events. |
@@ -45,6 +49,9 @@ Civic issues are often reported across disconnected channels, with limited locat
 | Audit and activity | Actor, action, entity, previous/new values, request context, and timestamps are stored for auditable actions; administrators can query activity. |
 | Exports and reports | Admin CSV exports for complaints, volunteers, and analytics; PDF reports for monthly, executive admin, and individual volunteer performance. |
 | Public access | No-login city transparency portal and complaint status/timeline tracking pages. |
+| Citizen feedback | One 1–5 star rating per resolved complaint, optional comment, unique database constraint, and volunteer average rating. |
+| Volunteer performance | Admin leaderboard combines resolved volume (40%), citizen rating (30%), resolution speed (20%), and assignment acceptance (10%). Volunteers can accept or decline new assignments. |
+| Image viewer | Reusable responsive fullscreen image viewer with zoom, previous/next controls, and Escape close. |
 | Progressive web app | Installable app manifest, offline app shell, user-scoped protected API cache, and install prompt. |
 | AI classification | Optional Flask service predicts complaint category and priority and returns confidence, toxicity/spam flags, and explanatory reasons. Predictions are persisted as classification runs. |
 
@@ -60,12 +67,14 @@ AI classification and volunteer recommendations are decision-support features. A
 ### Volunteer
 
 - View assigned complaints and update their work status.
+- Accept or decline assignments; see the average citizen rating on the volunteer dashboard.
 - Add work-start and completion photos before moving a complaint into progress or resolving it.
 - Maintain volunteer expertise and location details used by assignment recommendations.
 
 ### Admin
 
 - Review complaints, change eligible statuses, reject with a reason, assign or reassign volunteers, and inspect recommendations.
+- Review top volunteer scores and ratings on the admin dashboard.
 - View operational analytics, rejection information, and activity logs; export CSV and PDF reports.
 
 ## System architecture
@@ -253,9 +262,15 @@ The API is rooted at `/api/v1`. Protected routes require an access token except 
 | `GET` | `/api/v1/public/transparency` | Public | City complaint totals, resolution time, categories, location summary, and active areas. |
 | `GET` | `/api/v1/public/complaints/:complaintId` | Public | Safe complaint status, volunteer name, and status timeline for tracking. |
 | `GET` | `/api/v1/analytics/heatmap` | Admin | Filterable complaint density points by category, status, and date range. |
+| `GET` | `/api/v1/analytics/overview` | Admin | Total, open, and resolved complaint totals plus resolution rate for dashboard KPIs. |
+| `GET` | `/api/v1/analytics/categories` | Admin | Complaint counts grouped by category for the analytics dashboard. |
+| `GET` | `/api/v1/analytics/areas` | Admin | Top 20 complaint areas by count for the analytics dashboard. |
+| `GET` | `/api/v1/analytics/resolution-trend` | Admin | Daily resolved complaint counts for the last 30 UTC calendar days. |
 | `GET` | `/api/v1/analytics/hotspots` | Admin | Top complaint zones, outcome hotspots, and monthly hotspot metrics. |
 | `GET` | `/api/v1/analytics/geo-summary` | Admin | Aggregated complaint counts by city, area, category, and status. |
+| `GET` | `/api/v1/analytics/leaderboard` | Admin | Top volunteer weighted scores, ratings, response acceptance, and completion speed. |
 | `GET` | `/api/v1/complaints/:id` | Owner, assignee, or admin | Complaint details, history, and evidence. |
+| `POST` | `/api/v1/complaints/:id/feedback` | Reporting citizen, resolved complaint | Submit one 1–5 star rating and optional comment for the assigned volunteer. |
 | `PATCH` | `/api/v1/complaints/:id/status` | Volunteer or admin | Update an allowed lifecycle state; rejection requires a reason. |
 | `POST` / `DELETE` | `/api/v1/complaints/:id/vote` | Authenticated | Add or remove a complaint vote. |
 | `POST` | `/api/v1/complaints/:id/verify` | Citizen | Verify a complaint resolution when eligible. |
@@ -266,6 +281,7 @@ The API is rooted at `/api/v1`. Protected routes require an access token except 
 | `GET` | `/api/v1/assignments/my-assignments` | Volunteer | List the current volunteer’s assignments. |
 | `GET` | `/api/v1/assignments/my-route` | Volunteer | Get today’s active assignments in greedy nearest-neighbour visit order, estimated distance, and walking time. |
 | `PATCH` | `/api/v1/assignments/:complaintId/status` | Assigned volunteer | Advance assigned work status. |
+| `PATCH` | `/api/v1/assignments/:complaintId/response` | Assigned volunteer | Accept or decline a new assignment. |
 | `GET` | `/api/v1/dashboard/summary` | Authenticated | Dashboard metrics scoped to role and filters. |
 | `GET` | `/api/v1/dashboard/activity` | Admin | Query administrative audit activity. |
 | `GET` | `/api/v1/dashboard/export.csv` | Admin | Export dashboard complaint data as CSV. |
@@ -280,11 +296,14 @@ The API is rooted at `/api/v1`. Protected routes require an access token except 
 | `POST` | `/api/v1/uploads/images` | Authenticated | Upload complaint images (`multipart/form-data`). |
 | `POST` | `/api/v1/uploads/complaints/:complaintId/before-images` | Authenticated, authorized workflow | Add work-start evidence. |
 | `POST` | `/api/v1/uploads/complaints/:complaintId/after-images` | Authenticated, authorized workflow | Add completion evidence. |
+| `GET` | `/api/v1/assignments/completion-verifications/:complaintId` | Assigned volunteer or admin | Read processing state and resume pending verification work. |
+| `GET` | `/api/v1/assignments/completion-verifications` | Admin | List verified, processing, and review-required completion evidence. |
+| `PATCH` | `/api/v1/assignments/completion-verifications/:complaintId` | Admin | Approve or reject the automated completion review. |
 | `PATCH` | `/api/v1/users/me/volunteer-profile` | Volunteer | Update volunteer contact, city/area, availability, expertise, and location. |
 | `GET` | `/api/v1/geo/complaints/nearby` | Authenticated | Legacy scoped nearby complaint lookup. |
 | `POST` | `/api/v1/ai/complaints/:id/classify` | Complaint-access user | Request AI classification for a complaint. |
 
-For complete request/response details, see [`docs/api-design.md`](docs/api-design.md) and the backend route validators. The AI service separately exposes `GET /health` and `POST /v1/classify` to the API service.
+For complete request/response details, see [`docs/api-design.md`](docs/api-design.md) and the backend route validators. The AI service separately exposes `GET /health`, `POST /v1/classify`, and the internal completion-verification endpoints to the API service.
 
 ### Real-time events
 

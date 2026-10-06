@@ -11,6 +11,7 @@ import {
   supportDuplicate,
   listDuplicateComplaints,
   mergeDuplicateComplaint,
+  submitComplaintFeedback,
   updateComplaintStatus
 } from '../services/complaintService.js';
 import { DUPLICATE_CONFIDENCE_THRESHOLD } from '../services/duplicateDetectionService.js';
@@ -61,6 +62,12 @@ export async function vote(req, res, next) {
 export async function unvote(req, res, next) {
   try { return res.json({ success: true, data: await removeVote(req.params.id, req), message: 'Vote removed successfully' }); }
   catch (error) { return next(error); }
+}
+
+export async function submitFeedback(req, res, next) {
+  try {
+    return res.status(201).json({ success: true, data: await submitComplaintFeedback(req.params.id, req.body, req), message: 'Feedback submitted successfully' });
+  } catch (error) { return next(error); }
 }
 
 export async function supportDuplicateComplaint(req, res, next) {

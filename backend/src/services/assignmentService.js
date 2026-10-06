@@ -3,9 +3,10 @@ import Assignment from '../models/Assignment.js';
 import Complaint, { VOLUNTEER_WORKFLOW_STATUSES } from '../models/Complaint.js';
 import User from '../models/User.js';
 import { notifyRecommendationAccepted, notifyVolunteerAssigned } from './notificationService.js';
-import { publishComplaintUpdate, removeUserFromComplaintRoom } from './realtimeService.js';
+import { emitToRole, publishComplaintUpdate, removeUserFromComplaintRoom } from './realtimeService.js';
 import { recordAudit } from './auditService.js';
 import { distanceInKm } from './assignmentRecommendationService.js';
+import { requireVerifiedCompletion } from './completionVerificationService.js';
 
 export class AssignmentError extends Error {
   constructor(message, statusCode = 400, code = 'ASSIGNMENT_ERROR') {
@@ -140,6 +141,39 @@ export async function listMyAssignments(query, req) {
   return { items, page, limit, total, pages: Math.ceil(total / limit) };
 }
 
+export async function respondToAssignment(complaintId, response, req) {
+  if (req.user.role !== 'volunteer') throw new AssignmentError('Only volunteers can respond to assignments', 403, 'FORBIDDEN');
+  const complaint = await getComplaint(complaintId);
+  const assignment = await Assignment.findOne({ complaint: complaint._id, volunteer: objectId(req.user.sub, 'user id'), isActive: true });
+  if (!assignment) throw new AssignmentError('Active assignment not found', 404, 'NOT_FOUND');
+  if (complaint.status !== 'assigned') throw new AssignmentError('Only newly assigned complaints can be accepted or declined', 409, 'INVALID_STATUS');
+  if (assignment.responseStatus !== 'pending') throw new AssignmentError('You have already responded to this assignment', 409, 'ASSIGNMENT_ALREADY_RESPONDED');
+
+  const now = new Date();
+  assignment.responseStatus = response;
+  assignment.respondedAt = now;
+  if (response === 'accepted') assignment.acceptedAt = now;
+  if (response === 'declined') {
+    assignment.isActive = false;
+    assignment.endedAt = now;
+    assignment.endReason = 'Declined by volunteer';
+    const previousStatus = complaint.status;
+    complaint.assignedTo = undefined;
+    complaint.assignedVolunteer = undefined;
+    complaint.status = 'under_review';
+    complaint.statusHistory.push({
+      eventType: 'status_changed', previousStatus, status: 'under_review',
+      changedBy: objectId(req.user.sub, 'user id'), note: 'Volunteer declined the assignment', changedAt: now
+    });
+    await complaint.save();
+    publishComplaintUpdate(complaint, 'complaint:status');
+  }
+  await assignment.save();
+  await recordAudit({ req, action: `assignment.${response}`, entityType: 'assignment', entityId: assignment._id, newValue: response, metadata: { complaintId: String(complaint._id) } });
+  emitToRole('admin', 'dashboard:updated', { complaintId: String(complaint._id), eventType: `assignment.${response}` });
+  return assignment;
+}
+
 export async function updateAssignedStatus(complaintId, { status, note }, req) {
   if (req.user.role !== 'volunteer') throw new AssignmentError('Only volunteers can update assigned complaint status', 403, 'FORBIDDEN');
   if (!VOLUNTEER_WORKFLOW_STATUSES.includes(status)) throw new AssignmentError('Invalid volunteer workflow status', 400, 'VALIDATION_ERROR');
@@ -160,6 +194,13 @@ export async function updateAssignedStatus(complaintId, { status, note }, req) {
   }
   if (status === 'resolved' && complaint.afterImages.length === 0) {
     throw new AssignmentError('Upload at least one completion image before resolving this complaint', 409, 'WORK_EVIDENCE_REQUIRED');
+  }
+  if (status === 'resolved') await requireVerifiedCompletion(complaint);
+  if (assignment.responseStatus === 'pending') {
+    assignment.responseStatus = 'accepted';
+    assignment.acceptedAt = new Date();
+    assignment.respondedAt = assignment.acceptedAt;
+    await assignment.save();
   }
   complaint.status = statusFromWorkflow(status);
   if (status === 'resolved') complaint.resolvedAt = new Date();

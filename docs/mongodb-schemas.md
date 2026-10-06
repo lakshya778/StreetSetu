@@ -12,7 +12,17 @@ Duplicate detection extends complaint records with optional `duplicateScore` (0â
 
 Geo analytics adds optional `city` and `area` strings to complaints. Existing `location` remains a GeoJSON Point and retains its `2dsphere` index. Compound `{ category, status, createdAt }`, `{ city, area, createdAt }`, and `{ area, category, status, createdAt }` indexes support common date/category/status and place rollups. Heatmap, hotspot, and geographic summary endpoints use MongoDB aggregation pipelines with bounded heatmap output; legacy city/area labels are derived from the address when structured values are absent.
 
-The final release adds no mandatory collection migration. Public transparency and tracking are read-only projections of `complaints`; precise complaint coordinates, reporter identity, and internal update notes are excluded from public responses. Monthly/admin/volunteer reports aggregate existing complaint, user, and assignment records. Email HTML/text is rendered from reusable templates and is not stored; delivery status and notification text continue to use the existing `notifications` collection. The PWA stores user-scoped offline API snapshots in browser Cache Storage, not MongoDB.
+The Production Release v1 transparency, reporting, and PWA changes did not require a collection migration. Citizen feedback and explicit assignment responses add the migration described below. Public transparency and tracking are read-only projections of `complaints`; precise complaint coordinates, reporter identity, and internal update notes are excluded from public responses. Email HTML/text is rendered from reusable templates and is not stored. The PWA stores user-scoped offline API snapshots in browser Cache Storage, not MongoDB.
+
+### Citizen feedback and assignment acceptance schema update
+
+The `feedback` collection stores one rating per resolved complaint. `complaint` has a unique index (the database-level one-feedback constraint), while `volunteer` and `citizen` reference `users`. Rating is an integer from 1 to 5; optional `comment` is trimmed and capped at 1,000 characters. Feedback is only writable by the complaint's reporting citizen after resolution.
+
+Completion verification is stored as an optional embedded `complaints.completionVerification` object to preserve the existing complaint read contract. It contains `similarityScore`, `gpsMatched`, `gpsDistanceMeters`, `timestampValid`, `fraudScore`, `verificationStatus` (`pending|verified|needs_review|failed`), failure details, request/check timestamps, and optional admin decision metadata. A compound index on verification status and request time supports the admin review queue. Work evidence attachment subdocuments optionally store extracted `imageMetadata.latitude`, `imageMetadata.longitude`, and EXIF `imageMetadata.capturedAt`. No backfill is required; old evidence without metadata is sent to admin review when resolution is next attempted.
+
+`assignments` adds `responseStatus` (`pending|accepted|declined`), `acceptedAt`, and `respondedAt`. New assignments begin pending. Volunteer acceptance/decline is stored for the 10% leaderboard component; declining closes the assignment and returns the complaint to `under_review`. The migration backfills legacy assignments as accepted at their original `assignedAt` time to preserve existing workflow behavior.
+
+Run `npm run migrate:feedback-leaderboard` from `backend/` against the target database before deploying the API. It backfills assignment response state and creates feedback and response-status indexes. The migration is idempotent.
 
 ## Production deployment notes
 

@@ -54,3 +54,12 @@ export function validateWorkflowStatus(req, res, next) {
   req.body = { status, note };
   return next();
 }
+
+export function validateAssignmentResponse(req, res, next) {
+  const response = typeof req.body?.response === 'string' ? req.body.response.toLowerCase() : '';
+  if (!['accepted', 'declined'].includes(response)) {
+    return next(validationError([{ field: 'response', message: 'Response must be accepted or declined' }]));
+  }
+  req.body = { response };
+  return next();
+}

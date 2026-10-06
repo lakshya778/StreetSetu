@@ -6,9 +6,11 @@ import Complaint, {
 import Assignment from '../models/Assignment.js';
 import Vote from '../models/Vote.js';
 import DuplicateSupport from '../models/DuplicateSupport.js';
+import Feedback from '../models/Feedback.js';
 import { DUPLICATE_CONFIDENCE_THRESHOLD, findDuplicateCandidates } from './duplicateDetectionService.js';
-import { publishComplaintUpdate } from './realtimeService.js';
+import { emitToRole, emitToUser, publishComplaintUpdate } from './realtimeService.js';
 import { recordAudit } from './auditService.js';
+import { requireVerifiedCompletion } from './completionVerificationService.js';
 import {
   notifyComplaintRejected,
   notifyComplaintImagesUploaded,
@@ -113,9 +115,39 @@ export async function getComplaint(id, req) {
     .populate('rejectedBy', 'name email role')
     .populate('statusHistory.changedBy', 'name email role');
   ensureAccess(req, complaint);
-  complaint.voteCount = await Vote.countDocuments({ complaint: complaint._id });
-  complaint.supporterCount = complaint.voteCount;
-  return complaint;
+  const result = complaint.toObject();
+  result.voteCount = await Vote.countDocuments({ complaint: complaint._id });
+  result.supporterCount = result.voteCount;
+  if (req.user.role === 'citizen') {
+    result.myFeedback = await Feedback.findOne({ complaint: complaint._id, citizen: req.user.sub })
+      .select('rating comment createdAt updatedAt').lean();
+  }
+  return result;
+}
+
+export async function submitComplaintFeedback(id, { rating, comment }, req) {
+  if (req.user.role !== 'citizen') throw new ComplaintError('Only the reporting citizen can submit feedback', 403, 'FORBIDDEN');
+  const complaint = await Complaint.findById(objectId(id, 'complaint id'));
+  ensureAccess(req, complaint);
+  if (String(complaint.createdBy) !== String(req.user.sub)) {
+    throw new ComplaintError('Only the reporting citizen can submit feedback', 403, 'FORBIDDEN');
+  }
+  if (!['resolved', 'closed'].includes(complaint.status)) {
+    throw new ComplaintError('Feedback is available after the complaint is resolved', 409, 'COMPLAINT_NOT_RESOLVED');
+  }
+  const volunteer = complaint.assignedVolunteer || complaint.assignedTo;
+  if (!volunteer) throw new ComplaintError('This complaint has no assigned volunteer to rate', 409, 'VOLUNTEER_NOT_ASSIGNED');
+  try {
+    const feedback = await Feedback.create({ complaint: complaint._id, citizen: req.user.sub, volunteer, rating, comment });
+    await recordAudit({ req, action: 'complaint.feedback_submitted', entityType: 'complaint', entityId: complaint._id, metadata: { rating, volunteerId: String(volunteer) } });
+    const update = { complaintId: String(complaint._id), eventType: 'feedback:received' };
+    emitToRole('admin', 'dashboard:updated', update);
+    emitToUser(volunteer, 'feedback:received', update);
+    return { _id: feedback._id, complaint: feedback.complaint, volunteer: feedback.volunteer, rating: feedback.rating, comment: feedback.comment, createdAt: feedback.createdAt };
+  } catch (error) {
+    if (error?.code === 11000) throw new ComplaintError('Feedback has already been submitted for this complaint', 409, 'FEEDBACK_ALREADY_EXISTS');
+    throw error;
+  }
 }
 
 export async function listComplaints(query, req) {
@@ -293,7 +325,7 @@ export async function listMapComplaints(query = {}, req) {
     filter.$and = [...(filter.$and || []), { $or: [{ title: { $regex: escaped, $options: 'i' } }, { address: { $regex: escaped, $options: 'i' } }] }];
   }
   const [items, total] = await Promise.all([
-    Complaint.find(filter).select('_id title category status latitude longitude address attachments beforeImages afterImages')
+    Complaint.find(filter).select('_id title category status latitude longitude address attachments beforeImages afterImages isDuplicate duplicateOf masterComplaint duplicateScore')
       .sort({ createdAt: -1 }).skip(hasPagination ? (page - 1) * limit : 0).limit(limit).lean(),
     hasPagination ? Complaint.countDocuments(filter) : Promise.resolve(null)
   ]);
@@ -367,6 +399,7 @@ export async function updateComplaintStatus(id, { status, note }, req) {
   if (req.user.role === 'volunteer' && status === 'resolved' && complaint.afterImages.length === 0) {
     throw new ComplaintError('Upload at least one completion image before resolving this complaint', 409, 'WORK_EVIDENCE_REQUIRED');
   }
+  if (req.user.role === 'volunteer' && status === 'resolved') await requireVerifiedCompletion(complaint);
 
   const changedAt = new Date();
   complaint.status = status;

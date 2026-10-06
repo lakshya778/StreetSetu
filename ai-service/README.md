@@ -2,6 +2,8 @@
 
 Flask microservice that classifies civic complaints using a TF-IDF text vectorizer and two Logistic Regression outputs: complaint category and priority.
 
+The same service also extracts evidence-image EXIF metadata and asynchronously services backend completion checks using OpenAI CLIP image embeddings. Configure the API process with `AI_SERVICE_URL`, `AI_SERVICE_TOKEN`, `AI_METADATA_TIMEOUT_MS`, and `AI_VERIFICATION_TIMEOUT_MS`. The first verification downloads the configured CLIP model (`CLIP_MODEL_NAME`, default `openai/clip-vit-base-patch32`) from Hugging Face; provision model cache/storage and enough CPU/GPU memory for production workers.
+
 ## Setup
 
 Python 3.10 or newer is recommended. From the repository root:
@@ -72,3 +74,5 @@ Example response:
 ```
 
 `GET /health` returns a lightweight readiness response. Toxicity and spam checks are deliberately conservative heuristics; flagged complaints remain available for human review by the backend workflow.
+
+`POST /v1/image-metadata` accepts multipart field `image` and returns EXIF GPS coordinates and capture time when available. `POST /v1/verify-completion` is an internal backend endpoint that accepts complaint coordinates and before/after Cloudinary image URLs with extracted metadata, then returns `similarityScore`, `gpsMatched`, `gpsDistanceMeters`, `timestampValid`, `fraudScore`, `verificationStatus`, and a review reason. Evidence URLs must use an HTTPS host in `COMPLETION_IMAGE_HOSTS` (defaults to `res.cloudinary.com`). `COMPLETION_SIMILARITY_THRESHOLD` defaults to `0.45`; missing or inconsistent GPS/time evidence returns `needs_review`, not automatic approval.

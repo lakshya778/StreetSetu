@@ -25,10 +25,31 @@ const attachmentSchema = new mongoose.Schema(
     storageKey: { type: String, trim: true },
     uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     uploadedAt: { type: Date },
-    stage: { type: String, enum: ['complaint', 'before', 'after'], default: 'complaint' }
+    stage: { type: String, enum: ['complaint', 'before', 'after'], default: 'complaint' },
+    imageMetadata: {
+      latitude: { type: Number, min: -90, max: 90 },
+      longitude: { type: Number, min: -180, max: 180 },
+      capturedAt: { type: Date }
+    }
   },
   { _id: false }
 );
+
+const completionVerificationSchema = new mongoose.Schema({
+  similarityScore: { type: Number, min: 0, max: 100 },
+  gpsMatched: { type: Boolean },
+  gpsDistanceMeters: { type: Number, min: 0 },
+  timestampValid: { type: Boolean },
+  fraudScore: { type: Number, min: 0, max: 100 },
+  verificationStatus: { type: String, enum: ['pending', 'verified', 'needs_review', 'failed'] },
+  evidenceFingerprint: { type: String, trim: true, maxlength: 128 },
+  failureReason: { type: String, trim: true, maxlength: 500 },
+  requestedAt: { type: Date },
+  checkedAt: { type: Date },
+  reviewDecision: { type: String, enum: ['approved', 'rejected'] },
+  reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  reviewedAt: { type: Date }
+}, { _id: false });
 
 const statusHistorySchema = new mongoose.Schema(
   {
@@ -90,6 +111,7 @@ const complaintSchema = new mongoose.Schema(
     attachments: { type: [attachmentSchema], default: [] },
     beforeImages: { type: [attachmentSchema], default: [] },
     afterImages: { type: [attachmentSchema], default: [] },
+    completionVerification: { type: completionVerificationSchema },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
     assignedVolunteer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
@@ -121,5 +143,6 @@ complaintSchema.index({ wardId: 1, createdAt: -1 });
 complaintSchema.index({ category: 1, status: 1, createdAt: -1 });
 complaintSchema.index({ city: 1, area: 1, createdAt: -1 });
 complaintSchema.index({ area: 1, category: 1, status: 1, createdAt: -1 });
+complaintSchema.index({ 'completionVerification.verificationStatus': 1, 'completionVerification.requestedAt': -1 });
 
 export default mongoose.model('Complaint', complaintSchema);

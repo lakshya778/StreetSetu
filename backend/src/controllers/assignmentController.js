@@ -2,10 +2,12 @@ import {
   assignComplaint,
   listMyAssignments,
   reassignComplaint,
+  respondToAssignment,
   updateAssignedStatus
 } from '../services/assignmentService.js';
 import { recommendVolunteers } from '../services/assignmentRecommendationService.js';
 import { getVolunteerRoute } from '../services/routeOptimizationService.js';
+import { getCompletionVerification, listCompletionVerifications, reviewCompletionVerification } from '../services/completionVerificationService.js';
 
 export async function assign(req, res, next) {
   try {
@@ -47,4 +49,25 @@ export async function updateStatus(req, res, next) {
   try {
     return res.json({ success: true, data: await updateAssignedStatus(req.params.complaintId, req.body, req), message: 'Complaint status updated successfully' });
   } catch (error) { return next(error); }
+}
+
+export async function respond(req, res, next) {
+  try {
+    return res.json({ success: true, data: await respondToAssignment(req.params.complaintId, req.body.response, req), message: `Assignment ${req.body.response}` });
+  } catch (error) { return next(error); }
+}
+
+export async function completionVerification(req, res, next) {
+  try { return res.json({ success: true, data: await getCompletionVerification(req.params.complaintId, req), message: 'Completion verification loaded' }); }
+  catch (error) { return next(error); }
+}
+
+export async function completionVerifications(req, res, next) {
+  try { return res.json({ success: true, data: await listCompletionVerifications(), message: 'Completion verification queue loaded' }); }
+  catch (error) { return next(error); }
+}
+
+export async function reviewCompletion(req, res, next) {
+  try { return res.json({ success: true, data: await reviewCompletionVerification(req.params.complaintId, req.body.decision, req), message: 'Completion verification review saved' }); }
+  catch (error) { return next(error); }
 }

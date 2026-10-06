@@ -5,6 +5,7 @@ import { notifyComplaintImagesUploaded } from './notificationService.js';
 import { deleteImagesFromCloudinary, uploadImagesToCloudinary } from './uploadService.js';
 import { recordAudit } from './auditService.js';
 import { publishComplaintUpdate } from './realtimeService.js';
+import { extractEvidenceMetadata, queueCompletionVerification } from './completionVerificationService.js';
 
 function evidenceError(message, statusCode = 400, code = 'EVIDENCE_ERROR') {
   const error = new Error(message);
@@ -43,14 +44,16 @@ export async function addWorkEvidence({ complaintId, stage, files, req }) {
     throw evidenceError(`A maximum of 5 ${stage} images can be attached to one complaint`, 400, 'UPLOAD_VALIDATION_ERROR');
   }
 
+  const metadataByFile = await Promise.all(files.map((file) => extractEvidenceMetadata(file)));
   const uploaded = await uploadImagesToCloudinary(files, req.user.sub, {
     purpose: 'work-evidence',
     complaintId: complaint._id
   });
-  const evidence = uploaded.map((image) => ({
+  const evidence = uploaded.map((image, index) => ({
     ...image,
     uploadedBy: volunteerId,
-    stage
+    stage,
+    imageMetadata: metadataByFile[index]
   }));
   target.push(...evidence);
 
@@ -67,7 +70,10 @@ export async function addWorkEvidence({ complaintId, stage, files, req }) {
   }
 
   await recordAudit({ req, action: 'complaint.evidence_uploaded', entityType: 'complaint', entityId: complaint._id, metadata: { stage, count: evidence.length } });
+  if (stage === 'after' && complaint.beforeImages.length > 0) {
+    complaint.completionVerification = await queueCompletionVerification(complaint._id);
+  }
   publishComplaintUpdate(complaint, 'complaint:status');
 
-  return { stage, images: target };
+  return { stage, images: target, completionVerification: complaint.completionVerification };
 }

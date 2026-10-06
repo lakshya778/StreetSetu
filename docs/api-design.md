@@ -64,6 +64,16 @@ Existing complaint endpoints and response envelopes remain unchanged. Complaint 
 
 Cloudinary configuration uses `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, and optional `CLOUDINARY_UPLOAD_FOLDER`. Volunteer status changes to `in_progress` and `resolved` require the corresponding evidence.
 
+### AI completion verification
+
+- Each uploaded work image is sent to the internal Python AI service for EXIF GPS and capture-time extraction. The parsed metadata is stored beside the attachment in the complaint document.
+- When after evidence exists, the API persists `completionVerification.verificationStatus: pending` and starts verification asynchronously. The worker compares before/after image embeddings with OpenAI CLIP, requires every evidence image GPS point to be within 200 m of the complaint, and checks capture times for presence, plausible age, and before/after order.
+- `GET /api/v1/assignments/completion-verifications/:complaintId` (assigned volunteer or admin): returns verification fields; checking a pending record also resumes processing after an API restart.
+- `GET /api/v1/assignments/completion-verifications` (admin): returns the latest 100 verified, pending, and review-required complaints.
+- `PATCH /api/v1/assignments/completion-verifications/:complaintId` (admin): accepts `{ "decision": "approve" | "reject" }`. Approval marks the evidence verified; rejection keeps it in review. Both decisions are audited.
+- Volunteers cannot move a complaint to `resolved` until verification is `verified`. Pending checks return `409 VERIFICATION_PENDING`; flagged or unavailable checks return `409 VERIFICATION_NEEDS_REVIEW`. Admin review approval allows the volunteer to retry the existing resolve action.
+- Verification data is additive and optional, so legacy complaint reads remain backward compatible. The internal AI API exposes `POST /v1/image-metadata` (multipart `image`) and `POST /v1/verify-completion` (internal JSON payload); both honor `AI_SERVICE_TOKEN`.
+
 ### Volunteer profile and recommendations
 
 - `PATCH /api/v1/users/me/volunteer-profile` (volunteer): accepts the existing `expertiseCategories` and `location` fields plus optional `phone`, `area`, `city`, and `availability` (`available|limited|unavailable|full_time|part_time|weekend|flexible`). Both coordinates must be provided together; the API stores a GeoJSON Point. Existing payloads remain valid.
@@ -71,6 +81,14 @@ Cloudinary configuration uses `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CL
 - `GET /api/v1/assignments/:complaintId/recommendations` (admin): backward-compatible full recommendation list with the same scoring fields and legacy aliases.
 - `POST /api/v1/assignments/:complaintId/assign` remains compatible with `{ "volunteerId": "ObjectId" }`; optional `{ "recommendationAccepted": true }` additionally records recommendation acceptance notification.
 - Admins may manually assign any eligible volunteer through the existing assignment endpoint or auto-assign the highest ranked available volunteer in the admin complaint workflow. Assignment records retain `distanceKm` when both complaint and volunteer coordinates are known.
+- `PATCH /api/v1/assignments/:complaintId/response` (assigned volunteer): accepts `{ "response": "accepted" | "declined" }`. A declined assignment is closed and the complaint returns to `under_review`. For backward compatibility, the existing status-update endpoint implicitly records acceptance if an older client advances a pending assignment.
+
+### Citizen feedback and volunteer leaderboard
+
+- `POST /api/v1/complaints/:id/feedback` (reporting citizen, resolved/closed complaints only): accepts `{ "rating": 1..5, "comment"?: "..." }`. The comment is optional and limited to 1,000 characters. A unique index allows one feedback record per complaint; repeat submissions return `409 FEEDBACK_ALREADY_EXISTS`.
+- The authenticated complaint detail response adds `myFeedback` for the reporting citizen so the UI can show their saved rating. Existing detail fields are retained.
+- `GET /api/v1/analytics/leaderboard?limit=10` (admin): returns ranked active volunteers with weighted score and score breakdown. Score components are normalized to 0–100 and weighted as resolved complaint volume 40%, average citizen rating 30%, resolution speed 20%, and accepted/responded assignments 10%. Volunteers without observations for a component receive zero for that component.
+- Volunteer `/api/v1/dashboard/summary` adds `averageRating` and `ratingCount`; existing fields are unchanged.
 
 ### Dashboard analytics additions
 
@@ -969,6 +987,20 @@ Authorization: Bearer <jwt_access_token>
 ---
 
 ## 12. Dashboard and Analytics APIs
+
+### 12.0 Admin Analytics Dashboard
+
+The following admin-only endpoints power the dashboard's complaint category and area charts, daily resolution trend, and volunteer performance ranking. Each endpoint returns the standard `{ success, data, message }` envelope. Overview, categories, and areas accept the supported category, status, and date filters where applicable; `resolution-trend` always returns the last 30 UTC calendar days, including zero-count days. Area and category responses are count-descending arrays. Leaderboard accepts `limit` (1–50, default 10) and returns the existing weighted volunteer score contract.
+
+| Method and path | Data |
+| --- | --- |
+| `GET /api/v1/analytics/overview` | `totalComplaints`, `openComplaints`, `resolvedComplaints`, `resolutionRate` |
+| `GET /api/v1/analytics/categories` | Array of `{ category, count }` |
+| `GET /api/v1/analytics/areas` | Top 20 array of `{ area, count }` |
+| `GET /api/v1/analytics/resolution-trend` | `{ days: [{ date, label, resolved }], totalResolved }` for the last 30 days |
+| `GET /api/v1/analytics/leaderboard?limit=10` | Ranked volunteer performance with weighted score and component metrics |
+
+The endpoints are additive and admin protected; existing dashboard and geographic analytics routes retain their contracts.
 
 ### 12.1 Dashboard Summary
 

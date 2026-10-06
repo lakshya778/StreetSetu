@@ -8,6 +8,7 @@ from functools import lru_cache
 from flask import Flask, jsonify, request
 
 from utils.classifier import ComplaintClassifier
+from utils.completion_verification import extract_metadata, verify_completion
 
 
 # Backend compatible categories
@@ -137,6 +138,7 @@ def _authorized():
 
 
 app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = 12 * 1024 * 1024
 
 
 # Model ko startup pe load karo (gunicorn --preload ke saath master process mein),
@@ -250,6 +252,40 @@ def classify():
         return jsonify({
             "error": f"Classifier unavailable: {error}"
         }), 503
+
+
+@app.post("/v1/image-metadata")
+def image_metadata():
+    if not _authorized():
+        return jsonify({"error": "Unauthorized"}), 401
+    image = request.files.get("image")
+    if not image:
+        return jsonify({"error": "An image file is required"}), 400
+    image_bytes = image.read(10 * 1024 * 1024 + 1)
+    if len(image_bytes) > 10 * 1024 * 1024:
+        return jsonify({"error": "Image must be 10 MB or smaller"}), 413
+    try:
+        return jsonify({"success": True, "data": extract_metadata(image_bytes)})
+    except Exception as error:
+        app.logger.info("Image EXIF metadata could not be extracted: %s", error)
+        return jsonify({"success": True, "data": {"latitude": None, "longitude": None, "capturedAt": None}})
+
+
+@app.post("/v1/verify-completion")
+def completion_verification():
+    if not _authorized():
+        return jsonify({"error": "Unauthorized"}), 401
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"error": "Request body must be a JSON object"}), 400
+    try:
+        result = verify_completion(payload)
+        return jsonify({"success": True, "data": result})
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+    except Exception as error:
+        app.logger.exception("Completion evidence verification failed")
+        return jsonify({"error": f"Completion verification unavailable: {error}"}), 503
 
 
 if __name__ == "__main__":

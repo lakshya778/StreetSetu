@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import Complaint from '../models/Complaint.js';
 import DuplicateSupport from '../models/DuplicateSupport.js';
 import Assignment from '../models/Assignment.js';
+import Feedback from '../models/Feedback.js';
 
 const OPEN_STATUSES = [
   'submitted',
@@ -238,6 +239,12 @@ export async function getDashboardSummary(query, req) {
     ? Math.round((routeTotals.completedCount / routeTotals.completedDistanceKm) * 100) / 100 : 0;
   const routeEfficiencyScore = Math.min(100, Math.round(complaintsCompletedPerKm * 10));
   const averageCompletionDays = routeTotals.averageCompletionMs == null ? null : Math.round((routeTotals.averageCompletionMs / 86400000) * 10) / 10;
+  const volunteerRating = req.user.role === 'volunteer'
+    ? (await Feedback.aggregate([
+      { $match: { volunteer: new mongoose.Types.ObjectId(req.user.sub) } },
+      { $group: { _id: null, averageRating: { $avg: '$rating' }, ratingCount: { $sum: 1 } } }
+    ]))[0]
+    : null;
   const volunteerRank = req.user.role === 'volunteer'
     ? volunteerPerformance.findIndex((volunteer) => String(volunteer.volunteerId) === String(req.user.sub)) + 1 : null;
 
@@ -256,6 +263,8 @@ export async function getDashboardSummary(query, req) {
     wardStatistics: wardStats,
     volunteerPerformance,
     volunteerRank: volunteerRank > 0 ? volunteerRank : null,
+    averageRating: volunteerRating?.averageRating == null ? null : Math.round(volunteerRating.averageRating * 10) / 10,
+    ratingCount: volunteerRating?.ratingCount || 0,
     volunteerWorkload,
     totalVolunteerWorkload: volunteerWorkload.reduce((total, volunteer) => total + volunteer.activeAssignments, 0),
     averageResponseDistanceKm: averageResponseDistanceKm === undefined ? null : Math.round(averageResponseDistanceKm * 10) / 10,
