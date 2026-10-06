@@ -1,4 +1,4 @@
-import api from './client.js';
+import api, { ensureAccessToken } from './client.js';
 
 export async function getMyAssignments(params = {}) {
   const { data } = await api.get('/assignments/my-assignments', { params });
@@ -16,7 +16,10 @@ export async function assignComplaint(complaintId, volunteerId, { recommendation
 }
 
 export async function getVolunteerRecommendations(complaintId) {
-  const { data } = await api.get(`/assignments/recommend/${complaintId}`);
+  await ensureAccessToken();
+  const { data } = await api.get(`/assignments/recommend/${complaintId}`, {
+    streetsetuDiagnostic: 'volunteer-recommendations'
+  });
   return data.data;
 }
 

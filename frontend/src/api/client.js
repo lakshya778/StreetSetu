@@ -45,9 +45,37 @@ async function readOfflineApiResponse(error) {
 
 let refreshRequest;
 
+export async function ensureAccessToken() {
+  const currentToken = getAccessToken();
+  if (currentToken) return currentToken;
+
+  try {
+    refreshRequest ||= axios.post(`${api.defaults.baseURL}/auth/refresh`, {}, { withCredentials: true });
+    const { data } = await refreshRequest;
+    const accessToken = data.data.accessToken || data.data.token;
+    if (!accessToken) throw new Error('The refresh response did not include an access token');
+    setAccessToken(accessToken);
+    window.dispatchEvent(new CustomEvent('streetsetu:token-refreshed', { detail: { accessToken } }));
+    return accessToken;
+  } catch (refreshError) {
+    clearAccessToken();
+    localStorage.removeItem(SESSION_KEY);
+    window.dispatchEvent(new Event('streetsetu:session-expired'));
+    throw refreshError;
+  } finally {
+    refreshRequest = null;
+  }
+}
+
 api.interceptors.request.use((config) => {
   const token = getAccessToken();
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (config.streetsetuDiagnostic === 'volunteer-recommendations') {
+    console.info('[StreetSetu] Volunteer recommendations request', {
+      url: api.getUri(config),
+      authorizationHeaderPresent: Boolean(config.headers.Authorization)
+    });
+  }
   return config;
 });
 
@@ -55,7 +83,16 @@ export function getApiErrorMessage(error, fallback = 'Something went wrong. Plea
   return error?.response?.data?.error?.message || error?.response?.data?.message || fallback;
 }
 
-api.interceptors.response.use(async (response) => { await cacheApiResponse(response); return response; }, async (error) => {
+api.interceptors.response.use(async (response) => {
+  if (response.config.streetsetuDiagnostic === 'volunteer-recommendations') {
+    console.info('[StreetSetu] Volunteer recommendations response', { status: response.status });
+  }
+  await cacheApiResponse(response);
+  return response;
+}, async (error) => {
+  if (error.config?.streetsetuDiagnostic === 'volunteer-recommendations') {
+    console.info('[StreetSetu] Volunteer recommendations response', { status: error.response?.status ?? 'network error' });
+  }
   if (!error.response) {
     const cached = await readOfflineApiResponse(error);
     if (cached) return cached;
