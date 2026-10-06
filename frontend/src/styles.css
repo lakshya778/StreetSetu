@@ -280,3 +280,28 @@ h1, h2, p { margin-top: 0; }
 @media (max-width: 900px) { .geo-analytics-grid { grid-template-columns: 1fr 1fr; }.geo-analytics-grid > :last-child { grid-column: 1 / -1; } }
 @media (max-width: 680px) { .heatmap-filters { grid-template-columns: 1fr 1fr; }.geo-heatmap-map { height: 300px; }.geo-analytics-grid { grid-template-columns: 1fr; }.geo-analytics-grid > :last-child { grid-column: auto; }.heatmap-legend { flex-wrap: wrap; }.heatmap-legend small { flex-basis: 100%; margin-left: 0; } }
 @media (max-width: 680px) { .duplicate-admin-row { grid-template-columns: 1fr; gap: 11px; }.duplicate-admin-action { flex-wrap: wrap; }.duplicate-admin-action input { flex-basis: 100%; }.supporter-summary { align-items: flex-start; flex-wrap: wrap; }.supporter-summary button { margin-left: 0; } }
+
+/* Duplicate complaint prompt: accessible controls and a compact mobile flow. */
+.duplicate-modal { position: relative; padding: 26px; }
+.duplicate-modal-close { position: absolute; top: 12px; right: 12px; display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 50%; color: #456256; background: #f1f5ef; font-size: 25px; line-height: 1; cursor: pointer; }
+.duplicate-modal-close:hover, .duplicate-modal-close:focus-visible { background: #e4ede1; outline: 2px solid #789b7b; outline-offset: 2px; }
+.duplicate-modal-close:disabled { opacity: .55; cursor: wait; }
+.duplicate-supported-message { margin: 18px 0 0; border-radius: 8px; padding: 12px 14px; color: #315d3e; background: #edf7ec; font-size: 14px; font-weight: 700; }
+.duplicate-modal-error { margin: 12px 0 0; color: #a33d39; font-size: 13px; }
+.duplicate-modal-actions-supported { margin-top: 12px; }
+.duplicate-modal-footer { display: flex; justify-content: flex-end; margin-top: 14px; border-top: 1px solid #edf1ed; padding-top: 13px; }
+.duplicate-modal-footer .outline-button { min-height: 40px; }
+.complaint-load-error { width: min(100% - 32px, 560px); margin: 12vh auto; border: 1px solid #e5ebe4; border-radius: 12px; padding: 28px; background: #fff; box-shadow: 0 12px 40px rgba(20,43,34,.08); }
+.complaint-load-error h1 { margin: 0 0 8px; color: #29483e; font-size: 23px; }
+.complaint-load-error p { color: #718078; line-height: 1.55; }
+.complaint-load-error > div { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+@media (max-width: 600px) {
+  .duplicate-modal-backdrop { place-items: end center; padding: 0; }
+  .duplicate-modal { width: 100%; max-height: 92dvh; border-radius: 16px 16px 0 0; padding: 25px 18px max(18px, env(safe-area-inset-bottom)); }
+  .duplicate-modal h2 { max-width: calc(100% - 30px); font-size: 20px; }
+  .duplicate-candidate dl { justify-content: space-between; gap: 10px; }
+  .duplicate-modal-actions { display: grid; grid-template-columns: 1fr; }
+  .duplicate-modal-actions button, .duplicate-modal-footer .outline-button { min-height: 44px; width: 100%; }
+  .duplicate-modal-footer { display: grid; }
+  .complaint-load-error { margin: 8vh auto; padding: 22px; }
+}

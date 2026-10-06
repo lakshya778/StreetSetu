@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 export default function ImageGallery({ images = [], label = 'Images', compact = false, onRemove }) {
-  const availableImages = images.filter((image) => image?.url || image?.src || image?.previewUrl);
+  const availableImages = (Array.isArray(images) ? images : []).filter((image) => image?.url || image?.src || image?.previewUrl);
   const [activeIndex, setActiveIndex] = useState(null);
   const [zoom, setZoom] = useState(1);
   const isOpen = activeIndex !== null;

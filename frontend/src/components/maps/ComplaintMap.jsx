@@ -32,17 +32,18 @@ function createClusterIcon(cluster) {
 }
 
 function coordinatesFor(complaint) {
+  if (!complaint || typeof complaint !== 'object') return null;
   const latitude = Number(complaint.latitude ?? complaint.location?.coordinates?.[1]);
   const longitude = Number(complaint.longitude ?? complaint.location?.coordinates?.[0]);
   return Number.isFinite(latitude) && Number.isFinite(longitude) ? [latitude, longitude] : null;
 }
 
 function ComplaintMap({ complaints = [], className = '' }) {
-  const points = useMemo(() => complaints.map((complaint) => ({
+  const points = useMemo(() => (Array.isArray(complaints) ? complaints : []).filter(Boolean).map((complaint) => ({
     complaint,
     position: coordinatesFor(complaint),
     isDuplicate: Boolean(complaint.isDuplicate || complaint.duplicateOf || complaint.masterComplaint || complaint.duplicateScore > 0)
-  })).filter((item) => item.position), [complaints]);
+  })).filter((item) => item.position && item.complaint?._id), [complaints]);
   const center = points[0]?.position || defaultCenter;
 
   return <div className={`complaint-map-shell ${className}`}>
@@ -52,7 +53,7 @@ function ComplaintMap({ complaints = [], className = '' }) {
         {points.map(({ complaint, position, isDuplicate }) => <Marker key={complaint._id} position={position} icon={isDuplicate ? duplicatePinIcon : pinIcon} streetsetuDuplicate={isDuplicate}>
           <Popup>
             <div className={`map-popup-content${isDuplicate ? ' map-popup-duplicate' : ''}`}><strong>{complaint.title}</strong>{complaint.address && <span className="map-popup-address">{complaint.address}</span>}<span className="map-popup-status">{complaint.status?.replaceAll('_', ' ')}</span>{isDuplicate && <span className="map-duplicate-badge">Possible duplicate · {complaint.duplicateScore || 0}% match</span>}
-              <ImageGallery images={(complaint.attachments || []).slice(0, 4)} label="Complaint photos" compact />
+              <ImageGallery images={(Array.isArray(complaint.attachments) ? complaint.attachments : []).slice(0, 4)} label="Complaint photos" compact />
               <Link to={`/dashboard/complaints/${complaint._id}`}>View complaint</Link>
             </div>
           </Popup>
