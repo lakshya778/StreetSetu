@@ -13,18 +13,18 @@ const userSchema = new mongoose.Schema(
     city: { type: String, trim: true, maxlength: 120 },
     availability: { type: String, enum: ['available', 'limited', 'unavailable', 'full_time', 'part_time', 'weekend', 'flexible'], default: 'available', index: true },
     location: {
-        type: { type: String, enum: ['Point'] },
-        coordinates: {
-          type: [Number],
-          default: undefined,
-          validate: {
-            validator: (coordinates) => coordinates.length === 2
-              && coordinates[0] >= -180 && coordinates[0] <= 180
-              && coordinates[1] >= -90 && coordinates[1] <= 90,
-            message: 'Volunteer coordinates must be [longitude, latitude]'
-          }
+      type: { type: String, enum: ['Point'], default: 'Point' },
+      coordinates: {
+        type: [Number],
+        default: undefined,
+        validate: {
+          validator: (coordinates) => coordinates.length === 2
+            && coordinates[0] >= -180 && coordinates[0] <= 180
+            && coordinates[1] >= -90 && coordinates[1] <= 90,
+          message: 'Volunteer coordinates must be [longitude, latitude]'
         }
-      },
+      }
+    },
     isActive: { type: Boolean, default: true }
   },
   { timestamps: true }
@@ -36,7 +36,6 @@ userSchema.methods.toJSON = function toJSON() {
   return user;
 };
 
-userSchema.index({ location: '2dsphere' });
 userSchema.index({ role: 1, isActive: 1, location: '2dsphere' });
 
 export default mongoose.model('User', userSchema);

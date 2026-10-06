@@ -37,22 +37,49 @@ function availabilityScore(availability) {
   return 75;
 }
 
-async function nearbyVolunteers(complaintPoint) {
+async function nearbyVolunteers(complaintPoint, complaintId) {
   if (!complaintPoint) return User.find({ role: 'volunteer', isActive: true })
     .select('name email phone area city availability expertiseCategories location').limit(MAX_NEARBY_VOLUNTEERS).lean();
 
-  const located = await User.aggregate([
-    {
-      $geoNear: {
-        near: { type: 'Point', coordinates: complaintPoint },
-        distanceField: 'distanceMeters',
-        spherical: true,
-        query: { role: 'volunteer', isActive: true }
-      }
-    },
-    { $limit: MAX_NEARBY_VOLUNTEERS },
-    { $project: { name: 1, email: 1, phone: 1, area: 1, city: 1, availability: 1, expertiseCategories: 1, location: 1, distanceMeters: 1 } }
-  ]);
+  let located;
+  try {
+    located = await User.aggregate([
+      {
+        $geoNear: {
+          near: { type: 'Point', coordinates: complaintPoint },
+          key: 'location',
+          distanceField: 'distanceMeters',
+          spherical: true,
+          query: { role: 'volunteer', isActive: true }
+        }
+      },
+      { $limit: MAX_NEARBY_VOLUNTEERS },
+      { $project: { name: 1, email: 1, phone: 1, area: 1, city: 1, availability: 1, expertiseCategories: 1, location: 1, distanceMeters: 1 } }
+    ]);
+  } catch (error) {
+    console.error('[assignment-recommendations] $geoNear aggregation failed; using non-geospatial fallback', {
+      complaintId: String(complaintId),
+      errorName: error.name,
+      errorCode: error.code,
+      errorMessage: error.message,
+      stack: error.stack
+    });
+    try {
+      located = await User.find({ role: 'volunteer', isActive: true, location: { $exists: true, $ne: null } })
+        .select('name email phone area city availability expertiseCategories location')
+        .limit(MAX_NEARBY_VOLUNTEERS)
+        .lean();
+    } catch (fallbackError) {
+      console.error('[assignment-recommendations] Volunteer fallback query failed', {
+        complaintId: String(complaintId),
+        errorName: fallbackError.name,
+        errorCode: fallbackError.code,
+        errorMessage: fallbackError.message,
+        stack: fallbackError.stack
+      });
+      return [];
+    }
+  }
   const unlocated = located.length < MAX_NEARBY_VOLUNTEERS
     ? await User.find({ role: 'volunteer', isActive: true, $or: [{ location: { $exists: false } }, { location: null }] })
       .select('name email phone area city availability expertiseCategories location').limit(MAX_NEARBY_VOLUNTEERS - located.length).lean()
@@ -73,7 +100,7 @@ export async function recommendVolunteers(complaintId, { limit } = {}) {
   const complaintPoint = complaint.location?.coordinates || (Number.isFinite(complaint.longitude) && Number.isFinite(complaint.latitude)
     ? [complaint.longitude, complaint.latitude]
     : null);
-  const volunteers = await nearbyVolunteers(complaintPoint);
+  const volunteers = await nearbyVolunteers(complaintPoint, complaint._id);
   if (!volunteers.length) return [];
 
   const performance = await Assignment.aggregate([
