@@ -69,6 +69,12 @@ export function NotificationProvider({ children }) {
       connection.on('complaint:reassigned', dispatchUpdate);
       connection.on('complaint:status', dispatchUpdate);
       connection.on('complaint:rejected', dispatchUpdate);
+      connection.on('connect_error', (connectError) => {
+        if (/authentication required|invalid or expired token|account is unavailable/i.test(connectError.message || '')) {
+          connection?.disconnect();
+          window.dispatchEvent(new Event('streetsetu:session-expired'));
+        }
+      });
     }
     const refreshSocketToken = (event) => {
       if (!connection) return connect(event.detail.accessToken);

@@ -49,13 +49,31 @@ export async function addWorkEvidence({ complaintId, stage, files, req }) {
     purpose: 'work-evidence',
     complaintId: complaint._id
   });
-  const evidence = uploaded.map((image, index) => ({
+  const existingUrls = new Set(target.map((image) => image.url).filter(Boolean));
+  const uniqueUploads = [];
+  const duplicateUploads = [];
+  for (const image of uploaded) {
+    if (!image.url || existingUrls.has(image.url)) duplicateUploads.push(image);
+    else { existingUrls.add(image.url); uniqueUploads.push(image); }
+  }
+  const evidence = uniqueUploads.map((image) => ({
     ...image,
     uploadedBy: volunteerId,
     stage,
-    imageMetadata: metadataByFile[index]
+    imageMetadata: metadataByFile[uploaded.indexOf(image)]
   }));
-  target.push(...evidence);
+  if (!evidence.length) {
+    await deleteImagesFromCloudinary(uploaded);
+    throw evidenceError('No unique evidence images were uploaded', 409, 'DUPLICATE_EVIDENCE');
+  }
+  const uniqueExisting = [];
+  const savedUrls = new Set();
+  for (const image of target) {
+    if (!image.url || savedUrls.has(image.url)) continue;
+    savedUrls.add(image.url);
+    uniqueExisting.push(image);
+  }
+  target.splice(0, target.length, ...uniqueExisting, ...evidence);
   const previousStatus = complaint.status;
   if (stage === 'after') {
     complaint.status = 'needs_review';
@@ -76,6 +94,7 @@ export async function addWorkEvidence({ complaintId, stage, files, req }) {
     await deleteImagesFromCloudinary(uploaded);
     throw error;
   }
+  if (duplicateUploads.length) await deleteImagesFromCloudinary(duplicateUploads);
   try {
     await notifyComplaintImagesUploaded({ complaint, uploaderId: volunteerId, count: evidence.length, stage });
   } catch (error) {

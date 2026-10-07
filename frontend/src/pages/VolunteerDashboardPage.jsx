@@ -7,6 +7,7 @@ import { getCompletionVerification, getMyAssignments, getMyOptimizedRoute, respo
 import { uploadWorkEvidence } from '../api/complaints.js';
 import ImageGallery from '../components/media/ImageGallery.jsx';
 import ImageUploader from '../components/media/ImageUploader.jsx';
+import CompletionVerificationStatus from '../components/dashboard/CompletionVerificationStatus.jsx';
 import ComplaintMap from '../components/maps/ComplaintMap.jsx';
 import VolunteerRouteMap from '../components/maps/VolunteerRouteMap.jsx';
 import RouteSummaryCard from '../components/dashboard/RouteSummaryCard.jsx';
@@ -200,7 +201,7 @@ function AssignmentCard({ assignment, evidenceFiles, onEvidenceChange, updatingI
       {complaint.beforeImages?.length > 0 && <div className="assignment-evidence"><strong>Work-start photos</strong><ImageGallery images={complaint.beforeImages} label="Work-start photos" compact /></div>}
       {complaint.afterImages?.length > 0 && <div className="assignment-evidence"><strong>Completion photos</strong><ImageGallery images={complaint.afterImages} label="Completion photos" compact /></div>}
       {complaint.status === 'rejected' && <div className="volunteer-rejection-reason"><strong>Rejected</strong><span>{complaint.rejectionReason || 'Reason not recorded'}</span></div>}
-      {complaint.completionVerification && <div className={`completion-verification-inline verification-${complaint.completionVerification.verificationStatus}`}><strong>{complaint.completionVerification.verificationStatus === 'verified' ? 'Verified Work ✓' : complaint.completionVerification.verificationStatus === 'pending' ? 'Checking completion photos…' : 'Needs Review ⚠'}</strong>{complaint.completionVerification.verificationStatus !== 'pending' && <span>{complaint.completionVerification.failureReason || `Similarity ${complaint.completionVerification.similarityScore ?? '—'}% · GPS ${complaint.completionVerification.gpsMatched ? 'matched' : 'not verified'} · timestamps ${complaint.completionVerification.timestampValid ? 'valid' : 'flagged'}`}</span>}</div>}
+      <CompletionVerificationStatus verification={complaint.completionVerification} />
       <small>{complaint.address || `${complaint.latitude}, ${complaint.longitude}`}</small>
     </div></div>
     <div className="assignment-card-actions"><span className={`priority-label priority-${complaint.priority}`}>{complaint.priority}</span>

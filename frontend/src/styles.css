@@ -305,3 +305,48 @@ h1, h2, p { margin-top: 0; }
   .duplicate-modal-footer { display: grid; }
   .complaint-load-error { margin: 8vh auto; padding: 22px; }
 }
+
+.resolved-badge { color: #416249; background: #edf6e9; }
+.verification-rejected { color: #a4473a; background: #f8e2de; }
+.verification-unavailable { color: #66736c; background: #eef1ee; }
+.completion-review-copy > small { display: none; }
+.assignment-card, .panel, .details-grid > *, .admin-analytics-charts > *, .dashboard-grid > * { min-width: 0; }
+.table-wrap, .rejected-table-wrap { max-width: 100%; overscroll-behavior-x: contain; }
+.image-gallery-item img, .image-viewer-stage img { max-width: 100%; }
+
+@media (max-width: 1100px) {
+  .page-content { padding-right: 30px; padding-left: 30px; }
+  .dashboard-grid { grid-template-columns: minmax(0, 1.2fr) minmax(230px, .8fr); }
+}
+
+@media (max-width: 780px) {
+  .dashboard-grid, .admin-analytics-charts { grid-template-columns: minmax(0, 1fr); }
+  .page-content { padding-right: 18px; padding-left: 18px; }
+}
+
+@media (max-width: 680px) {
+  html, body, #root { width: 100%; max-width: 100%; overflow-x: clip; }
+  .app-shell, .main-column { min-width: 0; width: 100%; max-width: 100%; }
+  .page-content { width: 100%; padding: 22px 12px 36px; }
+  .panel { padding: 17px 14px; }
+  .page-heading { gap: 14px; }
+  .page-heading > div, .panel-heading > div { min-width: 0; }
+  .page-heading h1 { overflow-wrap: anywhere; }
+  .stats-grid, .dashboard-grid, .dashboard-charts-grid, .admin-analytics-kpis { grid-template-columns: minmax(0, 1fr); }
+  .table-wrap, .rejected-table-wrap { width: 100%; margin-right: 0; margin-left: 0; }
+  .admin-complaint-row, .duplicate-admin-row, .duplicate-admin-action, .recommendation-row { min-width: 0; }
+  .duplicate-modal-backdrop { padding: 10px; }
+  .duplicate-modal { width: 100%; max-width: 540px; max-height: calc(100dvh - 20px); }
+  .image-gallery { grid-template-columns: repeat(auto-fill, minmax(min(110px, 42vw), 1fr)); }
+  .image-viewer-stage > img { width: auto; height: auto; max-width: 100%; max-height: 100%; object-fit: contain; }
+  .volunteer-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 360px) {
+  .topbar { padding-right: 12px; padding-left: 12px; }
+  .page-content { padding-right: 10px; padding-left: 10px; }
+  .panel { padding-right: 12px; padding-left: 12px; }
+  .volunteer-metrics { grid-template-columns: minmax(0, 1fr); }
+  .rejection-stats-grid, .rejection-category-row { grid-template-columns: minmax(0, 1fr); }
+  .feedback-form-footer { align-items: stretch; flex-direction: column; }
+}

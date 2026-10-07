@@ -1,11 +1,18 @@
 import { useEffect, useState } from 'react';
 
 export default function ImageGallery({ images = [], label = 'Images', compact = false, onRemove }) {
-  const availableImages = (Array.isArray(images) ? images : []).filter((image) => image?.url || image?.src || image?.previewUrl);
+  const seenUrls = new Set();
+  const availableImages = (Array.isArray(images) ? images : []).reduce((unique, image, sourceIndex) => {
+    const url = image?.url || image?.src || image?.previewUrl;
+    if (!url || seenUrls.has(url)) return unique;
+    seenUrls.add(url);
+    unique.push({ image, url, sourceIndex });
+    return unique;
+  }, []);
   const [activeIndex, setActiveIndex] = useState(null);
   const [zoom, setZoom] = useState(1);
   const isOpen = activeIndex !== null;
-  const activeImage = isOpen ? availableImages[activeIndex] : null;
+  const activeImage = isOpen ? availableImages[activeIndex]?.image : null;
   const activeSrc = activeImage?.url || activeImage?.previewUrl || activeImage?.src;
   const activeAlt = activeImage?.fileName || activeImage?.alt || `${label} ${activeIndex + 1}`;
 
@@ -37,15 +44,15 @@ export default function ImageGallery({ images = [], label = 'Images', compact = 
 
   return <>
     <div className={`image-gallery ${compact ? 'image-gallery-compact' : ''}`} aria-label={label}>
-      {availableImages.map((image, index) => {
-        const src = image.url || image.previewUrl || image.src;
+      {availableImages.map(({ image, url, sourceIndex }, index) => {
+        const src = url;
         const alt = image.fileName || image.alt || `${label} ${index + 1}`;
-        return <figure className="image-gallery-item" key={image.storageKey || `${src}-${index}`}>
+        return <figure className="image-gallery-item" key={src}>
           <button type="button" className="image-gallery-trigger" onClick={() => showImage(index)} aria-label={`View ${alt}`}>
             <img src={src} alt={alt} loading="lazy" />
           </button>
           {image.fileName && !compact && <figcaption>{image.fileName}</figcaption>}
-          {onRemove && <button type="button" className="image-gallery-remove" onClick={() => onRemove(index)} aria-label={`Remove ${alt}`}>×</button>}
+          {onRemove && <button type="button" className="image-gallery-remove" onClick={() => onRemove(sourceIndex)} aria-label={`Remove ${alt}`}>×</button>}
         </figure>;
       })}
     </div>

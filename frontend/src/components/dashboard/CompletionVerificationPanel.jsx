@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { getApiErrorMessage } from '../../api/client.js';
 import { getCompletionVerifications, reviewCompletionVerification } from '../../api/assignments.js';
 import { useNotifications } from '../../context/NotificationContext.jsx';
+import CompletionVerificationStatus from './CompletionVerificationStatus.jsx';
 
 export default function CompletionVerificationPanel() {
   const { socket } = useNotifications();
@@ -54,7 +55,7 @@ function ReviewGroup({ title, items, empty, onApprove, onReject, activeId }) {
     {items.length ? <div className="completion-review-list">{items.map((item) => {
       const result = item.completionVerification || {};
       return <article className="completion-review-row" key={item._id}>
-        <div className="completion-review-copy"><Link to={`/dashboard/complaints/${item._id}`}>{item.title}</Link><span>{item.category?.replaceAll('_', ' ')} · {item.status?.replaceAll('_', ' ')} · {item.assignedVolunteer?.name || item.assignedTo?.name || 'Volunteer unassigned'}</span><small>{result.failureReason || `Similarity ${result.similarityScore ?? '—'}% · GPS ${result.gpsMatched ? 'matched' : 'not matched'}${result.gpsDistanceMeters == null ? '' : ` (${Math.round(result.gpsDistanceMeters)} m)`} · timestamp ${result.timestampValid ? 'valid' : 'flagged'} · fraud score ${result.fraudScore ?? '—'}`}</small></div>
+        <div className="completion-review-copy"><Link to={`/dashboard/complaints/${item._id}`}>{item.title}</Link><span>{item.category?.replaceAll('_', ' ')} ? {item.status?.replaceAll('_', ' ')} ? {item.assignedVolunteer?.name || item.assignedTo?.name || 'Volunteer unassigned'}</span><CompletionVerificationStatus verification={result} /></div>
         {(onApprove || onReject) && <div className="completion-review-actions"><button type="button" disabled={activeId === item._id} onClick={() => onApprove?.(item._id)}>{activeId === item._id ? 'Saving…' : 'Approve work'}</button><button type="button" className="outline-button" disabled={activeId === item._id} onClick={() => onReject?.(item._id)}>Keep under review</button></div>}
       </article>;
     })}</div> : <p className="completion-review-empty">{empty}</p>}

@@ -44,6 +44,28 @@ async function readOfflineApiResponse(error) {
 }
 
 let refreshRequest;
+let sessionExpirationDispatched = false;
+
+function dispatchSessionExpired() {
+  clearAccessToken();
+  localStorage.removeItem(SESSION_KEY);
+  if (!sessionExpirationDispatched) {
+    sessionExpirationDispatched = true;
+    window.dispatchEvent(new Event('streetsetu:session-expired'));
+  }
+}
+
+function isPublicApiRequest(config) {
+  const url = String(config.url || '');
+  return config.skipAccessToken
+    || /\/auth\/(login|register|refresh|logout)(?:\?|$)/.test(url)
+    || /\/public\/(transparency|complaints)(?:\/|\?|$)/.test(url);
+}
+
+function storeAccessToken(token) {
+  sessionExpirationDispatched = false;
+  setAccessToken(token);
+}
 
 export async function ensureAccessToken() {
   const currentToken = getAccessToken();
@@ -54,28 +76,25 @@ export async function ensureAccessToken() {
     const { data } = await refreshRequest;
     const accessToken = data.data.accessToken || data.data.token;
     if (!accessToken) throw new Error('The refresh response did not include an access token');
-    setAccessToken(accessToken);
+    storeAccessToken(accessToken);
     window.dispatchEvent(new CustomEvent('streetsetu:token-refreshed', { detail: { accessToken } }));
     return accessToken;
   } catch (refreshError) {
-    clearAccessToken();
-    localStorage.removeItem(SESSION_KEY);
-    window.dispatchEvent(new Event('streetsetu:session-expired'));
+    dispatchSessionExpired();
     throw refreshError;
   } finally {
     refreshRequest = null;
   }
 }
 
-api.interceptors.request.use((config) => {
-  const token = getAccessToken();
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  if (config.streetsetuDiagnostic === 'volunteer-recommendations') {
-    console.info('[StreetSetu] Volunteer recommendations request', {
-      url: api.getUri(config),
-      authorizationHeaderPresent: Boolean(config.headers.Authorization)
-    });
+api.interceptors.request.use(async (config) => {
+  let token = getAccessToken();
+  if (token) sessionExpirationDispatched = false;
+  if (!token && !isPublicApiRequest(config)) {
+    if (!localStorage.getItem(SESSION_KEY)) throw new axios.CanceledError('No signed-in session');
+    token = await ensureAccessToken();
   }
+  if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
@@ -84,35 +103,31 @@ export function getApiErrorMessage(error, fallback = 'Something went wrong. Plea
 }
 
 api.interceptors.response.use(async (response) => {
-  if (response.config.streetsetuDiagnostic === 'volunteer-recommendations') {
-    console.info('[StreetSetu] Volunteer recommendations response', { status: response.status });
-  }
   await cacheApiResponse(response);
   return response;
 }, async (error) => {
-  if (error.config?.streetsetuDiagnostic === 'volunteer-recommendations') {
-    console.info('[StreetSetu] Volunteer recommendations response', { status: error.response?.status ?? 'network error' });
-  }
   if (!error.response) {
     const cached = await readOfflineApiResponse(error);
     if (cached) return cached;
   }
   const original = error.config;
   const isAuthRequest = /\/auth\/(login|register|refresh|logout)/.test(original?.url || '');
-  if (error.response?.status !== 401 || !original || original._retry || isAuthRequest) throw error;
+  if (error.response?.status !== 401 || !original || isAuthRequest) throw error;
+  if (original._retry) {
+    dispatchSessionExpired();
+    throw error;
+  }
   original._retry = true;
   try {
     refreshRequest ||= axios.post(`${api.defaults.baseURL}/auth/refresh`, {}, { withCredentials: true });
     const { data } = await refreshRequest;
     const accessToken = data.data.accessToken || data.data.token;
-    setAccessToken(accessToken);
+    storeAccessToken(accessToken);
     original.headers.Authorization = `Bearer ${accessToken}`;
     window.dispatchEvent(new CustomEvent('streetsetu:token-refreshed', { detail: { accessToken } }));
     return api(original);
   } catch (refreshError) {
-    clearAccessToken();
-    localStorage.removeItem(SESSION_KEY);
-    window.dispatchEvent(new Event('streetsetu:session-expired'));
+    dispatchSessionExpired();
     throw refreshError;
   } finally {
     refreshRequest = null;

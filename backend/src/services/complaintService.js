@@ -66,6 +66,15 @@ function ensureAccess(req, complaint) {
   }
 }
 
+function uniqueImagesByUrl(images = []) {
+  const urls = new Set();
+  return images.filter((image) => {
+    if (!image?.url || urls.has(image.url)) return false;
+    urls.add(image.url);
+    return true;
+  });
+}
+
 export async function createComplaint(payload, req) {
   const creator = userId(req);
   const candidates = await findDuplicateCandidates(payload, { limit: 1 });
@@ -79,6 +88,9 @@ export async function createComplaint(payload, req) {
   const duplicateOf = bestCandidate && bestCandidate.confidence >= DUPLICATE_CONFIDENCE_THRESHOLD * 100 ? bestCandidate.complaint._id : undefined;
   const complaint = await Complaint.create({
     ...payload,
+    attachments: uniqueImagesByUrl(payload.attachments),
+    beforeImages: uniqueImagesByUrl(payload.beforeImages),
+    afterImages: uniqueImagesByUrl(payload.afterImages),
     allowDuplicate: undefined,
     createdBy: creator,
     isDuplicate: Boolean(duplicateOf),
