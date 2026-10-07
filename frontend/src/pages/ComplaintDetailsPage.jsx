@@ -105,7 +105,6 @@ export default function ComplaintDetailsPage() {
     if (!complaint || !canUpdate) return [];
     if (user.role === 'admin') return ADMIN_TRANSITIONS[complaint.status] || [];
     if (complaint.status === 'assigned') return ['in_progress'];
-    if (complaint.status === 'in_progress') return ['resolved'];
     return [];
   }, [canUpdate, complaint, user?.role]);
 

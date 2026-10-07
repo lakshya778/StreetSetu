@@ -383,7 +383,7 @@ export async function updateComplaintStatus(id, { status, note }, req) {
   }
 
   const allowedTransitions = req.user.role === 'volunteer'
-    ? (previousStatus === 'assigned' ? ['in_progress'] : previousStatus === 'in_progress' ? ['resolved'] : [])
+    ? (previousStatus === 'assigned' ? ['in_progress'] : [])
     : ADMIN_STATUS_TRANSITIONS[previousStatus] || [];
   if (!allowedTransitions.includes(status)) {
     throw new ComplaintError(

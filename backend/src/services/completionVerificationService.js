@@ -201,8 +201,18 @@ export async function reviewCompletionVerification(complaintId, decision, req) {
   complaint.completionVerification.reviewedBy = req.user.sub;
   complaint.completionVerification.reviewedAt = new Date();
   if (decision === 'reject') complaint.completionVerification.failureReason = 'Admin review rejected the submitted completion evidence.';
+  const previousStatus = complaint.status;
+  if (decision === 'approve' && complaint.status === 'needs_review') {
+    complaint.status = 'resolved';
+    complaint.resolvedAt = new Date();
+    complaint.statusHistory.push({
+      eventType: 'status_changed', previousStatus, status: 'resolved', changedBy: req.user.sub,
+      assignedVolunteer: complaint.assignedVolunteer || complaint.assignedTo,
+      note: 'Completion evidence approved by admin', changedAt: new Date()
+    });
+  }
   await complaint.save();
-  await recordAudit({ req, action: decision === 'approve' ? 'complaint.completion_verification_approved' : 'complaint.completion_verification_rejected', entityType: 'complaint', entityId: complaint._id, metadata: { fraudScore: complaint.completionVerification.fraudScore } });
+  await recordAudit({ req, action: decision === 'approve' ? 'complaint.completion_verification_approved' : 'complaint.completion_verification_rejected', entityType: 'complaint', entityId: complaint._id, previousValue: previousStatus, newValue: complaint.status, metadata: { fraudScore: complaint.completionVerification.fraudScore } });
   publishComplaintUpdate(complaint, 'complaint:status');
   emitToRole('admin', 'dashboard:updated', { complaintId: String(complaint._id), eventType: 'completion_verification_reviewed' });
   return complaint.completionVerification;

@@ -56,6 +56,19 @@ export async function addWorkEvidence({ complaintId, stage, files, req }) {
     imageMetadata: metadataByFile[index]
   }));
   target.push(...evidence);
+  const previousStatus = complaint.status;
+  if (stage === 'after') {
+    complaint.status = 'needs_review';
+    complaint.statusHistory.push({
+      eventType: 'status_changed',
+      previousStatus,
+      status: 'needs_review',
+      changedBy: volunteerId,
+      assignedVolunteer: volunteerId,
+      note: 'Completion photos submitted for review',
+      changedAt: new Date()
+    });
+  }
 
   try {
     await complaint.save();
@@ -69,7 +82,7 @@ export async function addWorkEvidence({ complaintId, stage, files, req }) {
     console.error('Work evidence notification failed:', error.message);
   }
 
-  await recordAudit({ req, action: 'complaint.evidence_uploaded', entityType: 'complaint', entityId: complaint._id, metadata: { stage, count: evidence.length } });
+  await recordAudit({ req, action: 'complaint.evidence_uploaded', entityType: 'complaint', entityId: complaint._id, previousValue: stage === 'after' ? previousStatus : undefined, newValue: stage === 'after' ? 'needs_review' : undefined, metadata: { stage, count: evidence.length } });
   if (stage === 'after' && complaint.beforeImages.length > 0) {
     complaint.completionVerification = await queueCompletionVerification(complaint._id);
   }

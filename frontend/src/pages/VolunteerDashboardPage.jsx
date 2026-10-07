@@ -14,12 +14,12 @@ import VolunteerProfileForm from '../components/layout/VolunteerProfileForm.jsx'
 import { useAuth } from '../context/AuthContext.jsx';
 import { useNotifications } from '../context/NotificationContext.jsx';
 
-const RESOLVED_STATUSES = ['resolved', 'closed'];
-const COMPLETED_ASSIGNMENT_STATUSES = ['completed', 'resolved'];
-const STATUS_LABELS = { assigned: 'Assigned', in_progress: 'In Progress', resolved: 'Resolved', closed: 'Closed', rejected: 'Rejected' };
+const RESOLVED_STATUSES = ['resolved'];
+const STATUS_LABELS = { assigned: 'Assigned', in_progress: 'In Progress', needs_review: 'Needs Review', resolved: 'Resolved', rejected: 'Rejected' };
 const WORKFLOW_GROUPS = [
   { key: 'assigned', label: 'Assigned', tone: 'assignment-amber' },
   { key: 'in_progress', label: 'In progress', tone: 'assignment-blue' },
+  { key: 'needs_review', label: 'Needs review', tone: 'assignment-amber' },
   { key: 'resolved', label: 'Resolved', tone: 'assignment-green' },
   { key: 'rejected', label: 'Rejected', tone: 'assignment-red' }
 ];
@@ -87,6 +87,7 @@ export default function VolunteerDashboardPage() {
         await uploadWorkEvidence(complaintId, stage, files);
         setEvidenceFiles((current) => ({ ...current, [complaintId]: [] }));
         await loadAssignments();
+        if (stage === 'after') return;
       }
       if (status === 'resolved') {
         let verification = await getCompletionVerification(complaintId);
@@ -125,14 +126,13 @@ export default function VolunteerDashboardPage() {
   }
 
   const metrics = useMemo(() => {
-    const total = analytics.totalComplaints ?? assignmentMeta.total;
-    const inProgress = analytics.statusCounts?.find((entry) => entry.status === 'in_progress')?.count || 0;
-    const resolved = analytics.resolvedComplaints ?? assignments.filter(({ complaint }) => RESOLVED_STATUSES.includes(complaint?.status)).length;
-    const rejected = analytics.rejectedComplaints ?? assignments.filter(({ complaint }) => complaint?.status === 'rejected').length;
-    const eligibleAssignments = total - rejected;
+    const activeAssignments = assignments.filter(({ complaint }) => ['assigned', 'in_progress', 'needs_review'].includes(complaint?.status)).length;
+    const resolved = assignments.filter(({ complaint }) => RESOLVED_STATUSES.includes(complaint?.status)).length;
+    const rejected = assignments.filter(({ complaint }) => complaint?.status === 'rejected').length;
+    const eligibleAssignments = resolved + rejected;
     return {
-      total,
-      inProgress,
+      total: activeAssignments,
+      inProgress: assignments.filter(({ complaint }) => complaint?.status === 'in_progress').length,
       resolved,
       rejected,
       rate: eligibleAssignments > 0 ? Math.round((resolved / eligibleAssignments) * 100) : 0,
@@ -170,9 +170,7 @@ export default function VolunteerDashboardPage() {
     </div>
     <div className="volunteer-assignment-toolbar"><label>Search assignments<input value={assignmentSearch} onChange={(event) => setAssignmentSearch(event.target.value)} placeholder="Title, category, address" /></label></div>
     <div className="assignment-groups">{WORKFLOW_GROUPS.map((group) => {
-      const items = filteredAssignments.filter(({ complaint, ...assignment }) => group.key === 'resolved'
-        ? RESOLVED_STATUSES.includes(complaint?.status) || COMPLETED_ASSIGNMENT_STATUSES.includes(assignment.status) || (complaint?.afterImages || []).length > 0
-        : complaint?.status === group.key && (group.key === 'rejected' || (!(complaint?.afterImages || []).length && !COMPLETED_ASSIGNMENT_STATUSES.includes(assignment.status))));
+      const items = filteredAssignments.filter(({ complaint }) => complaint?.status === group.key);
       return <section className="assignment-section" key={group.key}>
         <div className="assignment-section-heading"><div><p className="eyebrow">Workflow</p><h2>{group.label}</h2></div><span className={`assignment-count ${group.tone}`}>{items.length}</span></div>
         {isLoading ? <div className="loading-state compact-loading">Loading...</div> : items.length
@@ -186,15 +184,14 @@ export default function VolunteerDashboardPage() {
 
 function AssignmentCard({ assignment, evidenceFiles, onEvidenceChange, updatingId, onStatusChange, onAssignmentResponse }) {
   const complaint = assignment.complaint;
-  const hasCompletionPhotos = (complaint.afterImages || []).length > 0;
-  const isResolved = RESOLVED_STATUSES.includes(complaint.status)
-    || COMPLETED_ASSIGNMENT_STATUSES.includes(assignment.status)
-    || hasCompletionPhotos;
-  const needsResponse = assignment.responseStatus === 'pending' && !isResolved;
-  const nextStatus = !isResolved && !needsResponse && complaint.status === 'assigned' ? 'in_progress' : !isResolved && !needsResponse && complaint.status === 'in_progress' ? 'resolved' : null;
+  const isResolved = RESOLVED_STATUSES.includes(complaint.status);
+  const needsReview = complaint.status === 'needs_review';
+  const needsResponse = assignment.responseStatus === 'pending' && complaint.status === 'assigned';
+  const nextStatus = !isResolved && !needsReview && !needsResponse && complaint.status === 'assigned' ? 'in_progress' : !isResolved && !needsReview && complaint.status === 'in_progress' ? 'needs_review' : null;
   const evidenceStage = complaint.status === 'assigned' ? 'before' : 'after';
   const savedEvidence = evidenceStage === 'before' ? complaint.beforeImages || [] : complaint.afterImages || [];
-  console.log({ complaintId: complaint._id, status: complaint.status, beforeImagesCount: (complaint.beforeImages || []).length, afterImagesCount: (complaint.afterImages || []).length, assignmentStatus: assignment.status || assignment.responseStatus });
+  const workflowBucket = ['assigned', 'in_progress', 'needs_review', 'resolved', 'rejected'].includes(complaint.status) ? complaint.status : 'unknown';
+  console.log({ assignmentId: assignment._id, status: complaint.status, workflowBucket });
   return <article className={`assignment-card ${complaint.status === 'rejected' ? 'assignment-card-rejected' : ''}`}>
     <div className="assignment-card-body"><div className={`status-dot status-${complaint.status}`} /><div>
       <div className="assignment-card-meta"><span>{complaint.category?.replaceAll('_', ' ')}</span><time>{new Date(assignment.assignedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</time></div>
@@ -208,10 +205,12 @@ function AssignmentCard({ assignment, evidenceFiles, onEvidenceChange, updatingI
     </div></div>
     <div className="assignment-card-actions"><span className={`priority-label priority-${complaint.priority}`}>{complaint.priority}</span>
       {complaint.status === 'rejected' && <span className="status-badge rejected-badge">Rejected</span>}
+      {needsReview && <span className="status-badge">Needs Review</span>}
       {isResolved && <span className="status-badge resolved-badge">Resolved</span>}
-      {!nextStatus && <Link className="assignment-action" to={`/dashboard/complaints/${complaint._id}`}>View details <span>→</span></Link>}
+      {!nextStatus && !isResolved && <Link className="assignment-action" to={`/dashboard/complaints/${complaint._id}`}>View details <span>→</span></Link>}
     </div>
-    {nextStatus && <div className="assignment-evidence-step"><strong>{evidenceStage === 'before' ? 'Before starting' : 'Before resolving'}</strong><ImageGallery images={savedEvidence} label={evidenceStage === 'before' ? 'Work-start evidence' : 'Completion evidence'} compact /><ImageUploader files={evidenceFiles} onChange={onEvidenceChange} disabled={updatingId === complaint._id} label={evidenceStage === 'before' ? 'Add work-start image' : 'Add completion image'} /><button className="assignment-action evidence-submit-button" disabled={updatingId === complaint._id || (!savedEvidence.length && !evidenceFiles.length)} onClick={() => onStatusChange(complaint._id, nextStatus, evidenceStage, evidenceFiles)}>{updatingId === complaint._id ? 'Saving...' : `Upload & mark ${statusLabel(nextStatus)}`}</button></div>}
+    {nextStatus && <div className="assignment-evidence-step"><strong>{evidenceStage === 'before' ? 'Before starting' : 'Before submitting for review'}</strong><ImageGallery images={savedEvidence} label={evidenceStage === 'before' ? 'Work-start evidence' : 'Completion evidence'} compact /><ImageUploader files={evidenceFiles} onChange={onEvidenceChange} disabled={updatingId === complaint._id} label={evidenceStage === 'before' ? 'Add work-start image' : 'Add completion image'} /><button className="assignment-action evidence-submit-button" disabled={updatingId === complaint._id || !evidenceFiles.length} onClick={() => onStatusChange(complaint._id, nextStatus, evidenceStage, evidenceFiles)}>{updatingId === complaint._id ? 'Saving...' : evidenceStage === 'before' ? `Upload & mark ${statusLabel(nextStatus)}` : 'Upload completion photos'}</button></div>}
+    {needsReview && <div className="assignment-response-actions"><p>Completion photos are waiting for admin review.</p></div>}
     {needsResponse && <div className="assignment-response-actions"><p>This assignment is awaiting your response.</p><button className="primary-button compact-button" disabled={updatingId === complaint._id} onClick={() => onAssignmentResponse(complaint._id, 'accepted')}>Accept assignment</button><button className="outline-button" disabled={updatingId === complaint._id} onClick={() => onAssignmentResponse(complaint._id, 'declined')}>Decline</button></div>}
   </article>;
 }

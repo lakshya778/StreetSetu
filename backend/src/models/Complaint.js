@@ -13,7 +13,7 @@ export const COMPLAINT_CATEGORIES = [
 ];
 
 export const COMPLAINT_PRIORITIES = ['low', 'medium', 'high', 'critical'];
-export const COMPLAINT_STATUSES = ['submitted', 'under_review', 'assigned', 'in_progress', 'resolved', 'closed', 'rejected'];
+export const COMPLAINT_STATUSES = ['submitted', 'under_review', 'assigned', 'in_progress', 'needs_review', 'resolved', 'closed', 'rejected'];
 export const VOLUNTEER_WORKFLOW_STATUSES = ['assigned', 'in_progress', 'resolved'];
 
 const attachmentSchema = new mongoose.Schema(
