@@ -20,8 +20,8 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM: ${SMTP_FROM:-}
-      AI_SERVICE_URL: ${AI_SERVICE_URL:-}
-      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:-}
+      AI_SERVICE_URL: ${AI_SERVICE_URL:?Set AI_SERVICE_URL to the deployed AI service base URL}
+      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:?Set AI_SERVICE_TOKEN to match the AI service}
     ports:
       - "${API_PORT:-5000}:5000"
     healthcheck:

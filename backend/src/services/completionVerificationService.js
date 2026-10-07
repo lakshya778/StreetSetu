@@ -33,21 +33,45 @@ function authHeaders() {
 
 async function readServiceResponse(response) {
   let body;
-  try { body = await response.json(); } catch { throw new Error('AI service returned an invalid response'); }
-  if (!response.ok) throw new Error(body.error || `AI service returned HTTP ${response.status}`);
+  try { body = await response.json(); } catch {
+    const error = new Error('AI service returned an invalid response');
+    error.code = 'AI_INVALID_RESPONSE';
+    throw error;
+  }
+  if (!response.ok) {
+    const error = new Error(body.error || `AI service returned HTTP ${response.status}`);
+    error.statusCode = response.status;
+    throw error;
+  }
   return body.data || body;
+}
+
+function aiFailureMessage(error) {
+  if (/not configured/i.test(error.message || '')) return 'AI_SERVICE_URL is not configured';
+  if (error.statusCode) {
+    return error.statusCode >= 500
+      ? `AI service unavailable (HTTP ${error.statusCode})`
+      : `AI service returned HTTP ${error.statusCode}`;
+  }
+  if (error.code === 'AI_INVALID_RESPONSE') return 'AI service returned an invalid response';
+  if (error.name === 'AbortError' || error.name === 'TimeoutError') return 'AI service unavailable (request timed out)';
+  return 'AI service unavailable (connection failed)';
 }
 
 export async function extractEvidenceMetadata(file) {
   try {
     const form = new FormData();
     form.append('image', new Blob([file.buffer], { type: file.mimetype }), file.originalname || 'evidence-image');
-    const response = await fetch(serviceUrl('/v1/image-metadata'), {
+    const url = serviceUrl('/v1/image-metadata');
+    console.info('[AI] metadata request', { url, tokenConfigured: Boolean(process.env.AI_SERVICE_TOKEN) });
+    const response = await fetch(url, {
       method: 'POST', headers: authHeaders(), body: form,
       signal: AbortSignal.timeout(Number.parseInt(process.env.AI_METADATA_TIMEOUT_MS, 10) || 8000)
     });
+    console.info('[AI] metadata response', { url, httpStatus: response.status, ok: response.ok });
     return await readServiceResponse(response);
   } catch (error) {
+    console.error('[AI] metadata failed', { reason: error.message });
     console.warn('Evidence EXIF extraction unavailable:', error.message);
     return { latitude: null, longitude: null, capturedAt: null };
   }
@@ -79,6 +103,7 @@ function scheduleVerification(complaintId) {
 
 async function runVerification(complaintId) {
   let fingerprint;
+  let aiRequestError = null;
   try {
     const complaint = await Complaint.findById(complaintId);
     if (!complaint || complaint.completionVerification?.verificationStatus !== 'pending') return;
@@ -88,13 +113,35 @@ async function runVerification(complaintId) {
       beforeImages: complaint.beforeImages.map(({ url, imageMetadata, uploadedAt }) => ({ url, imageMetadata, uploadedAt })),
       afterImages: complaint.afterImages.map(({ url, imageMetadata, uploadedAt }) => ({ url, imageMetadata, uploadedAt }))
     };
-    const response = await fetch(serviceUrl('/v1/verify-completion'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(Number.parseInt(process.env.AI_VERIFICATION_TIMEOUT_MS, 10) || 120000)
+    let url;
+    try {
+      url = serviceUrl('/v1/verify-completion');
+    } catch (error) {
+      aiRequestError = error;
+      throw error;
+    }
+    console.info('[AI] verification request', {
+      url,
+      complaintId,
+      beforeImagesCount: payload.beforeImages.length,
+      afterImagesCount: payload.afterImages.length,
+      tokenConfigured: Boolean(process.env.AI_SERVICE_TOKEN)
     });
-    const result = await readServiceResponse(response);
+    let result;
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(Number.parseInt(process.env.AI_VERIFICATION_TIMEOUT_MS, 10) || 120000)
+      });
+      console.info('[AI] verification response', { url, complaintId, httpStatus: response.status, ok: response.ok });
+      result = await readServiceResponse(response);
+      console.info('[AI] verification result', { complaintId, verificationStatus: result.verificationStatus, similarityScore: result.similarityScore, gpsMatched: result.gpsMatched });
+    } catch (error) {
+      aiRequestError = error;
+      throw error;
+    }
     const latest = await Complaint.findById(complaintId);
     if (!latest || latest.completionVerification?.verificationStatus !== 'pending'
       || evidenceFingerprint(latest) !== fingerprint) return;
@@ -103,7 +150,10 @@ async function runVerification(complaintId) {
     publishComplaintUpdate(latest, 'complaint:status');
     emitToRole('admin', 'dashboard:updated', { complaintId, eventType: 'completion_verification' });
   } catch (error) {
-    console.error(`Completion verification failed for complaint ${complaintId}:`, error);
+    const failureReason = aiRequestError
+      ? aiFailureMessage(aiRequestError)
+      : 'Verification response was received but could not be saved';
+    console.error('[AI] verification failed', { complaintId, reason: failureReason, error: error.message });
     try {
       const complaint = await Complaint.findById(complaintId);
       if (complaint?.completionVerification?.verificationStatus === 'pending'
@@ -113,7 +163,7 @@ async function runVerification(complaintId) {
         complaint.completionVerification.timestampValid = false;
         complaint.completionVerification.fraudScore = 100;
         complaint.completionVerification.verificationStatus = 'needs_review';
-        complaint.completionVerification.failureReason = 'AI service unavailable';
+        complaint.completionVerification.failureReason = failureReason;
         complaint.completionVerification.checkedAt = new Date();
         await complaint.save();
         publishComplaintUpdate(complaint, 'complaint:status');
@@ -193,8 +243,23 @@ export async function reviewCompletionVerification(complaintId, decision, req) {
   if (!complaint) {
     const error = new Error('Complaint not found'); error.statusCode = 404; error.code = 'NOT_FOUND'; throw error;
   }
+  const requestedStatus = decision === 'approve' ? 'resolved' : complaint.status;
+  console.info('Completion review status transition requested', {
+    complaintId: String(complaint._id),
+    currentStatus: complaint.status,
+    requestedStatus,
+    workflowState: {
+      status: complaint.status,
+      verificationStatus: complaint.completionVerification?.verificationStatus || 'not_started',
+      reviewDecision: complaint.completionVerification?.reviewDecision || null
+    }
+  });
   if (!complaint.completionVerification || complaint.completionVerification.verificationStatus === 'pending') {
-    const error = new Error('Completion verification is not ready for review'); error.statusCode = 409; error.code = 'VERIFICATION_PENDING'; throw error;
+    const error = new Error('Completion verification is not ready for review');
+    error.statusCode = 409;
+    error.code = 'VERIFICATION_PENDING';
+    error.details = { currentStatus: complaint.status, requestedStatus, reason: 'Completion verification is still pending.' };
+    throw error;
   }
   complaint.completionVerification.verificationStatus = decision === 'approve' ? 'verified' : 'needs_review';
   complaint.completionVerification.reviewDecision = decision === 'approve' ? 'approved' : 'rejected';

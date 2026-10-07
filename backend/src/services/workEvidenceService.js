@@ -107,5 +107,23 @@ export async function addWorkEvidence({ complaintId, stage, files, req }) {
   }
   publishComplaintUpdate(complaint, 'complaint:status');
 
-  return { stage, images: target, completionVerification: complaint.completionVerification };
+  const workStartPhotos = complaint.beforeImages;
+  const completionPhotos = complaint.afterImages;
+  console.info('[Evidence] saved', {
+    complaintId: String(complaint._id),
+    stage,
+    workStartPhotosCount: workStartPhotos.length,
+    completionPhotosCount: completionPhotos.length,
+    status: complaint.status
+  });
+  return {
+    stage,
+    images: stage === 'before' ? workStartPhotos : completionPhotos,
+    workStartPhotos,
+    completionPhotos,
+    beforeImages: workStartPhotos,
+    afterImages: completionPhotos,
+    status: complaint.status,
+    completionVerification: complaint.completionVerification
+  };
 }

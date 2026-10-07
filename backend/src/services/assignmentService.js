@@ -9,11 +9,12 @@ import { distanceInKm } from './assignmentRecommendationService.js';
 import { requireVerifiedCompletion } from './completionVerificationService.js';
 
 export class AssignmentError extends Error {
-  constructor(message, statusCode = 400, code = 'ASSIGNMENT_ERROR') {
+  constructor(message, statusCode = 400, code = 'ASSIGNMENT_ERROR', details) {
     super(message);
     this.name = 'AssignmentError';
     this.statusCode = statusCode;
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -180,14 +181,29 @@ export async function updateAssignedStatus(complaintId, { status, note }, req) {
   const complaint = await getComplaint(complaintId);
   const assignment = await Assignment.findOne({ complaint: complaint._id, volunteer: objectId(req.user.sub, 'user id'), isActive: true });
   if (!assignment) throw new AssignmentError('Only the assigned volunteer can update this complaint', 403, 'FORBIDDEN');
-  if (complaint.status === status) throw new AssignmentError('Complaint already has this status', 409, 'CONFLICT');
+  const workflowState = {
+    status: complaint.status,
+    verificationStatus: complaint.completionVerification?.verificationStatus || 'not_started'
+  };
+  console.info('Assignment status transition requested', {
+    assignmentId: String(assignment._id),
+    complaintId: String(complaint._id),
+    currentStatus: complaint.status,
+    requestedStatus: status,
+    workflowState
+  });
+  if (complaint.status === status) throw new AssignmentError('Complaint already has this status', 409, 'INVALID_STATUS_TRANSITION', {
+    currentStatus: complaint.status, requestedStatus: status, reason: 'The requested status is already current.'
+  });
 
   const previousStatus = complaint.status;
-  const allowedNextStatus = previousStatus === 'assigned'
-    ? 'in_progress'
-    : previousStatus === 'in_progress' ? 'resolved' : null;
+  const allowedNextStatus = previousStatus === 'assigned' ? 'in_progress' : null;
   if (status !== allowedNextStatus) {
-    throw new AssignmentError(`Complaint cannot move from ${previousStatus} to ${status}`, 409, 'INVALID_STATUS_TRANSITION');
+    throw new AssignmentError(`Complaint cannot move from ${previousStatus} to ${status}`, 409, 'INVALID_STATUS_TRANSITION', {
+      currentStatus: previousStatus,
+      requestedStatus: status,
+      reason: `Allowed next status: ${allowedNextStatus || 'none'}.`
+    });
   }
   if (status === 'in_progress' && complaint.beforeImages.length === 0) {
     throw new AssignmentError('Upload at least one work-start image before starting this complaint', 409, 'WORK_EVIDENCE_REQUIRED');

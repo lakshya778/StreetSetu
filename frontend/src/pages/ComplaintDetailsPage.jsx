@@ -12,7 +12,8 @@ const ADMIN_TRANSITIONS = {
   submitted: ['under_review', 'rejected'],
   under_review: ['rejected'],
   assigned: ['in_progress'],
-  in_progress: ['resolved'],
+  in_progress: [],
+  needs_review: [],
   resolved: ['closed'],
   closed: [],
   rejected: []
@@ -104,7 +105,7 @@ export default function ComplaintDetailsPage() {
   const availableTransitions = useMemo(() => {
     if (!complaint || !canUpdate) return [];
     if (user.role === 'admin') return ADMIN_TRANSITIONS[complaint.status] || [];
-    if (complaint.status === 'assigned') return ['in_progress'];
+    if (complaint.status === 'assigned' && complaint.beforeImages?.length > 0) return ['in_progress'];
     return [];
   }, [canUpdate, complaint, user?.role]);
 

@@ -23,7 +23,8 @@ const ADMIN_STATUS_TRANSITIONS = {
   submitted: ['under_review', 'rejected'],
   under_review: ['rejected'],
   assigned: ['in_progress'],
-  in_progress: ['resolved'],
+  in_progress: [],
+  needs_review: [],
   resolved: ['closed'],
   closed: [],
   rejected: []
@@ -385,12 +386,23 @@ export async function updateComplaintStatus(id, { status, note }, req) {
   }
 
   const previousStatus = complaint.status;
+  const workflowState = {
+    status: complaint.status,
+    verificationStatus: complaint.completionVerification?.verificationStatus || 'not_started'
+  };
+  console.info('Complaint status transition requested', {
+    complaintId: String(complaint._id),
+    currentStatus: previousStatus,
+    requestedStatus: status,
+    workflowState
+  });
 
   if (previousStatus === status) {
     throw new ComplaintError(
       'Complaint already has this status',
       409,
-      'CONFLICT'
+      'INVALID_STATUS_TRANSITION',
+      { currentStatus: previousStatus, requestedStatus: status, reason: 'The requested status is already current.' }
     );
   }
 
@@ -401,7 +413,8 @@ export async function updateComplaintStatus(id, { status, note }, req) {
     throw new ComplaintError(
       `Complaint cannot move from ${previousStatus} to ${status}`,
       409,
-      'INVALID_STATUS_TRANSITION'
+      'INVALID_STATUS_TRANSITION',
+      { currentStatus: previousStatus, requestedStatus: status, reason: `Allowed next statuses: ${allowedTransitions.join(', ') || 'none'}.` }
     );
   }
 

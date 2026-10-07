@@ -85,5 +85,5 @@ export async function uploadWorkEvidence(complaintId, stage, files) {
   const { data } = await api.post(`/uploads/complaints/${complaintId}/${stage}-images`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   });
-  return data.data.images;
+  return data.data;
 }

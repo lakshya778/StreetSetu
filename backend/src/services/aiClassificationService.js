@@ -57,7 +57,14 @@ function validatePrediction(payload) {
 }
 
 export async function classifyComplaint(complaint, requestedBy) {
-  const config = aiServiceConfig();
+  let config;
+  try {
+    config = aiServiceConfig();
+  } catch (error) {
+    console.error('[AI] classify failed', { reason: error.message, tokenConfigured: Boolean(process.env.AI_SERVICE_TOKEN) });
+    throw error;
+  }
+  console.info('[AI] classify request', { url: config.url, complaintId: String(complaint._id), tokenConfigured: Boolean(process.env.AI_SERVICE_TOKEN) });
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
 
@@ -81,12 +88,14 @@ export async function classifyComplaint(complaint, requestedBy) {
     });
   } catch (error) {
     const code = error.name === 'AbortError' ? 'AI_SERVICE_TIMEOUT' : 'AI_SERVICE_UNAVAILABLE';
+    console.error('[AI] classify failed', { url: config.url, code, reason: error.message });
     throw new AIClassificationError('Unable to reach AI classification service', 503, code);
   } finally {
     clearTimeout(timeout);
   }
 
   if (!response.ok) {
+    console.error('[AI] classify response', { url: config.url, httpStatus: response.status, ok: false });
     throw new AIClassificationError(`AI classification service returned HTTP ${response.status}`, 502, 'AI_SERVICE_ERROR');
   }
 
@@ -94,10 +103,25 @@ export async function classifyComplaint(complaint, requestedBy) {
   try {
     body = await response.json();
   } catch (error) {
+    console.error('[AI] classify failed', { url: config.url, reason: 'invalid JSON response' });
     throw new AIClassificationError('AI classification service returned invalid JSON', 502, 'AI_INVALID_RESPONSE');
   }
 
-  const classification = validatePrediction(body.data || body);
+  let classification;
+  try {
+    classification = validatePrediction(body.data || body);
+  } catch (error) {
+    console.error('[AI] classify failed', { url: config.url, reason: error.message, code: error.code || 'AI_INVALID_RESPONSE' });
+    throw error;
+  }
+  console.info('[AI] classify response', {
+    url: config.url,
+    httpStatus: response.status,
+    ok: true,
+    category: classification.category,
+    priority: classification.priority,
+    confidence: classification.confidence
+  });
   const run = await AIClassificationRun.create({
     complaint: complaint._id,
     requestedBy,
