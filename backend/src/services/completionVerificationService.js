@@ -6,6 +6,16 @@ import { recordAudit } from './auditService.js';
 
 const activeVerifications = new Set();
 
+function verificationFailureReason(result) {
+  const reasons = [];
+  const configuredThreshold = Number.parseFloat(process.env.COMPLETION_SIMILARITY_THRESHOLD || '0.45');
+  const similarityThreshold = configuredThreshold <= 1 ? configuredThreshold * 100 : configuredThreshold;
+  if (Number.isFinite(result.similarityScore) && result.similarityScore < similarityThreshold) reasons.push('Similarity too low');
+  if (result.gpsMatched === false) reasons.push(result.gpsDistanceMeters == null ? 'GPS unavailable' : 'Distance mismatch');
+  if (result.timestampValid === false) reasons.push('Photo timestamps need review');
+  return reasons.length ? reasons.join('; ') : result.failureReason;
+}
+
 function evidenceFingerprint(complaint) {
   const evidence = [...complaint.beforeImages, ...complaint.afterImages]
     .map(({ url, uploadedAt, imageMetadata }) => ({ url, uploadedAt, imageMetadata }));
@@ -88,7 +98,7 @@ async function runVerification(complaintId) {
     const latest = await Complaint.findById(complaintId);
     if (!latest || latest.completionVerification?.verificationStatus !== 'pending'
       || evidenceFingerprint(latest) !== fingerprint) return;
-    latest.completionVerification = { ...result, evidenceFingerprint: fingerprint, requestedAt: latest.completionVerification.requestedAt, checkedAt: new Date() };
+    latest.completionVerification = { ...result, failureReason: verificationFailureReason(result), evidenceFingerprint: fingerprint, requestedAt: latest.completionVerification.requestedAt, checkedAt: new Date() };
     await latest.save();
     publishComplaintUpdate(latest, 'complaint:status');
     emitToRole('admin', 'dashboard:updated', { complaintId, eventType: 'completion_verification' });
@@ -103,7 +113,7 @@ async function runVerification(complaintId) {
         complaint.completionVerification.timestampValid = false;
         complaint.completionVerification.fraudScore = 100;
         complaint.completionVerification.verificationStatus = 'needs_review';
-        complaint.completionVerification.failureReason = 'Automated verification could not complete. Admin review is required.';
+        complaint.completionVerification.failureReason = 'AI service unavailable';
         complaint.completionVerification.checkedAt = new Date();
         await complaint.save();
         publishComplaintUpdate(complaint, 'complaint:status');
@@ -134,7 +144,8 @@ export async function requireVerifiedCompletion(complaint) {
     error.statusCode = 409; error.code = 'VERIFICATION_PENDING'; throw error;
   }
   if (verification?.verificationStatus !== 'verified') {
-    const error = new Error('Completion evidence needs admin review before this complaint can be resolved.');
+    const failureReason = verification ? verificationFailureReason(verification) : null;
+    const error = new Error(failureReason || 'Completion evidence needs admin review before this complaint can be resolved.');
     error.statusCode = 409; error.code = 'VERIFICATION_NEEDS_REVIEW'; throw error;
   }
 }

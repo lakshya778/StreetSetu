@@ -15,6 +15,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useNotifications } from '../context/NotificationContext.jsx';
 
 const RESOLVED_STATUSES = ['resolved', 'closed'];
+const COMPLETED_ASSIGNMENT_STATUSES = ['completed', 'resolved'];
 const STATUS_LABELS = { assigned: 'Assigned', in_progress: 'In Progress', resolved: 'Resolved', closed: 'Closed', rejected: 'Rejected' };
 const WORKFLOW_GROUPS = [
   { key: 'assigned', label: 'Assigned', tone: 'assignment-amber' },
@@ -85,6 +86,7 @@ export default function VolunteerDashboardPage() {
       if (files.length) {
         await uploadWorkEvidence(complaintId, stage, files);
         setEvidenceFiles((current) => ({ ...current, [complaintId]: [] }));
+        await loadAssignments();
       }
       if (status === 'resolved') {
         let verification = await getCompletionVerification(complaintId);
@@ -93,6 +95,7 @@ export default function VolunteerDashboardPage() {
           verification = await getCompletionVerification(complaintId);
         }
         if (verification.verificationStatus !== 'verified') {
+          await loadAssignments();
           setError(verification.verificationStatus === 'pending'
             ? 'Photo verification is still processing. Please try resolving this complaint again shortly.'
             : verification.failureReason || 'The completion photos need admin review before this complaint can be resolved.');
@@ -104,6 +107,7 @@ export default function VolunteerDashboardPage() {
         ? { ...assignment, complaint: { ...assignment.complaint, ...updated } }
         : assignment));
       setEvidenceFiles((current) => ({ ...current, [complaintId]: [] }));
+      await loadAssignments();
     } catch (requestError) {
       setError(getApiErrorMessage(requestError, 'Complaint status could not be updated.'));
     } finally { setUpdatingId(''); }
@@ -166,9 +170,9 @@ export default function VolunteerDashboardPage() {
     </div>
     <div className="volunteer-assignment-toolbar"><label>Search assignments<input value={assignmentSearch} onChange={(event) => setAssignmentSearch(event.target.value)} placeholder="Title, category, address" /></label></div>
     <div className="assignment-groups">{WORKFLOW_GROUPS.map((group) => {
-      const items = filteredAssignments.filter(({ complaint }) => group.key === 'resolved'
-        ? RESOLVED_STATUSES.includes(complaint?.status)
-        : complaint?.status === group.key);
+      const items = filteredAssignments.filter(({ complaint, ...assignment }) => group.key === 'resolved'
+        ? RESOLVED_STATUSES.includes(complaint?.status) || COMPLETED_ASSIGNMENT_STATUSES.includes(assignment.status) || (complaint?.afterImages || []).length > 0
+        : complaint?.status === group.key && (group.key === 'rejected' || (!(complaint?.afterImages || []).length && !COMPLETED_ASSIGNMENT_STATUSES.includes(assignment.status))));
       return <section className="assignment-section" key={group.key}>
         <div className="assignment-section-heading"><div><p className="eyebrow">Workflow</p><h2>{group.label}</h2></div><span className={`assignment-count ${group.tone}`}>{items.length}</span></div>
         {isLoading ? <div className="loading-state compact-loading">Loading...</div> : items.length
@@ -182,10 +186,15 @@ export default function VolunteerDashboardPage() {
 
 function AssignmentCard({ assignment, evidenceFiles, onEvidenceChange, updatingId, onStatusChange, onAssignmentResponse }) {
   const complaint = assignment.complaint;
-  const needsResponse = assignment.responseStatus === 'pending';
-  const nextStatus = !needsResponse && complaint.status === 'assigned' ? 'in_progress' : !needsResponse && complaint.status === 'in_progress' ? 'resolved' : null;
+  const hasCompletionPhotos = (complaint.afterImages || []).length > 0;
+  const isResolved = RESOLVED_STATUSES.includes(complaint.status)
+    || COMPLETED_ASSIGNMENT_STATUSES.includes(assignment.status)
+    || hasCompletionPhotos;
+  const needsResponse = assignment.responseStatus === 'pending' && !isResolved;
+  const nextStatus = !isResolved && !needsResponse && complaint.status === 'assigned' ? 'in_progress' : !isResolved && !needsResponse && complaint.status === 'in_progress' ? 'resolved' : null;
   const evidenceStage = complaint.status === 'assigned' ? 'before' : 'after';
   const savedEvidence = evidenceStage === 'before' ? complaint.beforeImages || [] : complaint.afterImages || [];
+  console.log({ complaintId: complaint._id, status: complaint.status, beforeImagesCount: (complaint.beforeImages || []).length, afterImagesCount: (complaint.afterImages || []).length, assignmentStatus: assignment.status || assignment.responseStatus });
   return <article className={`assignment-card ${complaint.status === 'rejected' ? 'assignment-card-rejected' : ''}`}>
     <div className="assignment-card-body"><div className={`status-dot status-${complaint.status}`} /><div>
       <div className="assignment-card-meta"><span>{complaint.category?.replaceAll('_', ' ')}</span><time>{new Date(assignment.assignedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</time></div>
@@ -199,6 +208,7 @@ function AssignmentCard({ assignment, evidenceFiles, onEvidenceChange, updatingI
     </div></div>
     <div className="assignment-card-actions"><span className={`priority-label priority-${complaint.priority}`}>{complaint.priority}</span>
       {complaint.status === 'rejected' && <span className="status-badge rejected-badge">Rejected</span>}
+      {isResolved && <span className="status-badge resolved-badge">Resolved</span>}
       {!nextStatus && <Link className="assignment-action" to={`/dashboard/complaints/${complaint._id}`}>View details <span>→</span></Link>}
     </div>
     {nextStatus && <div className="assignment-evidence-step"><strong>{evidenceStage === 'before' ? 'Before starting' : 'Before resolving'}</strong><ImageGallery images={savedEvidence} label={evidenceStage === 'before' ? 'Work-start evidence' : 'Completion evidence'} compact /><ImageUploader files={evidenceFiles} onChange={onEvidenceChange} disabled={updatingId === complaint._id} label={evidenceStage === 'before' ? 'Add work-start image' : 'Add completion image'} /><button className="assignment-action evidence-submit-button" disabled={updatingId === complaint._id || (!savedEvidence.length && !evidenceFiles.length)} onClick={() => onStatusChange(complaint._id, nextStatus, evidenceStage, evidenceFiles)}>{updatingId === complaint._id ? 'Saving...' : `Upload & mark ${statusLabel(nextStatus)}`}</button></div>}
