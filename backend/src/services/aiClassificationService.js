@@ -1,6 +1,11 @@
 import AIClassificationRun from '../models/AIClassificationRun.js';
 import { COMPLAINT_CATEGORIES, COMPLAINT_PRIORITIES } from '../models/Complaint.js';
 
+const MAX_RETRIES = 3;
+const RETRY_DELAYS_MS = [3000, 6000, 12000];
+const WAKE_TIMEOUT_MS = 10000;
+const RETRYABLE_STATUSES = new Set([502, 503, 504]);
+
 export class AIClassificationError extends Error {
   constructor(message, statusCode = 503, code = 'AI_SERVICE_UNAVAILABLE') {
     super(message);
@@ -16,8 +21,36 @@ function aiServiceConfig() {
   }
   return {
     url: `${process.env.AI_SERVICE_URL.replace(/\/$/, '')}/v1/classify`,
-    timeoutMs: Number.parseInt(process.env.AI_SERVICE_TIMEOUT_MS, 10) || 5000
+    healthUrl: `${process.env.AI_SERVICE_URL.replace(/\/$/, '')}/health`,
+    timeoutMs: Number.parseInt(process.env.AI_SERVICE_TIMEOUT_MS, 10) || 60000
   };
+}
+
+async function readResponseData(response) {
+  const text = await response.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+async function wakeAiService(url) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), WAKE_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    console.info('[AI] wake check', { url, httpStatus: response.status, ok: response.ok });
+  } catch (error) {
+    console.error('[AI] wake check failed', { url, reason: error.message });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function wait(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 function validatePrediction(payload) {
@@ -56,7 +89,7 @@ function validatePrediction(payload) {
   };
 }
 
-export async function classifyComplaint(complaint, requestedBy) {
+export async function classifyComplaint(complaint, requestedBy, retryAttempt = 0) {
   let config;
   try {
     config = aiServiceConfig();
@@ -88,24 +121,52 @@ export async function classifyComplaint(complaint, requestedBy) {
     });
   } catch (error) {
     const code = error.name === 'AbortError' ? 'AI_SERVICE_TIMEOUT' : 'AI_SERVICE_UNAVAILABLE';
-    console.error('[AI] classify failed', { url: config.url, code, reason: error.message });
+    console.error('[AI] classify failed', {
+      url: config.url,
+      status: undefined,
+      data: undefined,
+      message: error.message,
+      attempt: retryAttempt + 1
+    });
+    if (retryAttempt < MAX_RETRIES) {
+      await wakeAiService(config.healthUrl);
+      await wait(RETRY_DELAYS_MS[retryAttempt]);
+      return classifyComplaint(complaint, requestedBy, retryAttempt + 1);
+    }
     throw new AIClassificationError('Unable to reach AI classification service', 503, code);
   } finally {
     clearTimeout(timeout);
   }
 
+  const responseData = await readResponseData(response);
   if (!response.ok) {
-    console.error('[AI] classify response', { url: config.url, httpStatus: response.status, ok: false });
+    console.error('[AI] classify failed', {
+      url: config.url,
+      status: response.status,
+      data: responseData,
+      message: `AI classification service returned HTTP ${response.status}`,
+      attempt: retryAttempt + 1
+    });
+    if (RETRYABLE_STATUSES.has(response.status) && retryAttempt < MAX_RETRIES) {
+      await wakeAiService(config.healthUrl);
+      await wait(RETRY_DELAYS_MS[retryAttempt]);
+      return classifyComplaint(complaint, requestedBy, retryAttempt + 1);
+    }
     throw new AIClassificationError(`AI classification service returned HTTP ${response.status}`, 502, 'AI_SERVICE_ERROR');
   }
 
-  let body;
-  try {
-    body = await response.json();
-  } catch (error) {
-    console.error('[AI] classify failed', { url: config.url, reason: 'invalid JSON response' });
+  if (!responseData || typeof responseData !== 'object' || Array.isArray(responseData)) {
+    console.error('[AI] classify failed', {
+      url: config.url,
+      status: response.status,
+      data: responseData,
+      message: 'invalid JSON response',
+      attempt: retryAttempt + 1
+    });
     throw new AIClassificationError('AI classification service returned invalid JSON', 502, 'AI_INVALID_RESPONSE');
   }
+  const body = responseData;
+  console.log('AI response', body);
 
   let classification;
   try {

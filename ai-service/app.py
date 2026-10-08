@@ -67,7 +67,9 @@ SPAM_PATTERNS = (
 
 @lru_cache(maxsize=1)
 def get_classifier() -> ComplaintClassifier:
-    return ComplaintClassifier()
+    classifier = ComplaintClassifier()
+    app.logger.info("Model loaded successfully")
+    return classifier
 
 
 def _text_fields(payload: dict):
@@ -141,15 +143,7 @@ app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 12 * 1024 * 1024
 
 
-# Load only the local classifier artifacts during worker startup. Gunicorn
-# --preload loads these once before forking its single worker.
 print("AI service started", flush=True)
-try:
-    get_classifier()
-    print("Model loaded successfully", flush=True)
-except Exception:
-    app.logger.exception("Model load failed")
-    raise
 
 
 @app.get("/health")
@@ -162,8 +156,10 @@ def health():
 
 @app.post("/v1/classify")
 def classify():
+    app.logger.info("Classify request received")
 
     if not _authorized():
+        app.logger.error("AI service token mismatch")
         return jsonify({
             "error": "Unauthorized"
         }), 401
@@ -171,12 +167,14 @@ def classify():
     payload = request.get_json(silent=True)
 
     if not isinstance(payload, dict):
+        app.logger.warning("Classification request body is not a JSON object")
         return jsonify({
             "error": "Request body must be a JSON object"
         }), 400
 
-    try:
+    app.logger.info("Classification payload keys: %s", sorted(payload.keys()))
 
+    try:
         title, description = _text_fields(payload)
 
         result = get_classifier().classify(
@@ -227,11 +225,12 @@ def classify():
             )
         }
 
-        print("AI RESPONSE:", response, flush=True)
+        app.logger.info("Classification prediction: %s", response)
 
         return jsonify(response)
 
     except ValueError as error:
+        app.logger.exception("Invalid classification request")
         return jsonify({
             "error": str(error)
         }), 400
@@ -246,10 +245,7 @@ def classify():
         }), 503
 
     except Exception as error:
-        # Koi bhi unexpected error (model load, pickle, sklearn mismatch etc.)
-        app.logger.exception(
-            "Unexpected classification error"
-        )
+        app.logger.exception("Unexpected classification error")
 
         return jsonify({
             "error": f"Classifier unavailable: {error}"
