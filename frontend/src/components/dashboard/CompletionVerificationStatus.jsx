@@ -2,7 +2,7 @@ const PRESENTATIONS = {
   verified: { title: 'Verified Work', className: 'verification-verified' },
   pending: { title: 'Verification pending', className: 'verification-pending' },
   rejected: { title: 'Completion evidence rejected', className: 'verification-rejected' },
-  unavailable: { title: 'AI service unavailable', className: 'verification-unavailable' },
+  unavailable: { title: 'Manual review required', className: 'verification-unavailable' },
   needs_review: { title: 'Needs Review', className: 'verification-needs_review' }
 };
 
@@ -22,7 +22,7 @@ export default function CompletionVerificationStatus({ verification }) {
     : state === 'rejected'
       ? verification.failureReason || 'Admin review rejected the completion evidence.'
       : state === 'unavailable'
-        ? 'Automated verification could not complete. Admin review is required.'
+        ? 'Automated verification could not complete. Please review the completion evidence manually.'
         : verification.failureReason || `Similarity ${verification.similarityScore ?? '—'}% · GPS ${verification.gpsMatched ? 'matched' : 'not verified'} · timestamps ${verification.timestampValid ? 'valid' : 'flagged'}`;
 
   return <div className={`completion-verification-inline ${presentation.className}`} role="status">

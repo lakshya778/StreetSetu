@@ -4,6 +4,7 @@ import { getApiErrorMessage } from '../api/client.js';
 import { checkComplaintDuplicates, getComplaint, submitComplaintFeedback, supportDuplicateComplaint, updateComplaintStatus } from '../api/complaints.js';
 import { statusLabel } from '../components/complaints/ComplaintCard.jsx';
 import ImageGallery from '../components/media/ImageGallery.jsx';
+import CompletionVerificationStatus from '../components/dashboard/CompletionVerificationStatus.jsx';
 import ComplaintMap from '../components/maps/ComplaintMap.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useNotifications } from '../context/NotificationContext.jsx';
@@ -185,6 +186,7 @@ export default function ComplaintDetailsPage() {
           {complaint.status === 'rejected' && <div className="rejection-reason-box"><strong>Rejection reason</strong><p>{complaint.rejectionReason || history.find((event) => event.status === 'rejected')?.note || 'No reason was recorded for this historical rejection.'}</p>{complaint.rejectedAt && <small>Rejected {new Date(complaint.rejectedAt).toLocaleString('en-IN')}</small>}</div>}
           {complaint.address && <div className="location-block"><span>⌖</span><div><strong>{complaint.address}</strong><small>{complaint.latitude}, {complaint.longitude}</small></div></div>}
           {Array.isArray(complaint.attachments) && complaint.attachments.length > 0 && <div className="complaint-evidence"><h2>Reported photos</h2><ImageGallery images={complaint.attachments} label="Reported complaint images" /></div>}
+          <CompletionVerificationStatus verification={complaint.completionVerification} />
         </section>
         <aside className="panel history-panel">
           <div className="panel-heading"><div><p className="eyebrow">The paper trail</p><h2>Status history</h2></div></div>

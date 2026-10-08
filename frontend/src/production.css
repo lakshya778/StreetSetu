@@ -30,8 +30,6 @@
 .feedback-confirmation blockquote { margin: 12px 0 0; border-left: 3px solid #dce8d9; padding: 5px 12px; color: #5e7568; font-size: 12px; }
 .feedback-stars { color: #d49a42; font-size: 25px; letter-spacing: 2px; }
 .feedback-stars span { color: #dce4db; }
-.top-volunteers-card { margin: 18px 0; }
-.leaderboard-score-note { color: #91a097; font-size: 9px; }
 .leaderboard-score { color: #416249; }
 .leaderboard-area { display: block; margin-top: 3px; color: #91a097; font-size: 9px; }
 .assignment-response-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; border-top: 1px solid #e9eee8; padding: 12px 0 0; }

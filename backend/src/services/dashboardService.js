@@ -59,12 +59,7 @@ export async function getDashboardSummary(query, req) {
   resolutionTrends,
   volunteerTrends,
   wardStatistics,
-  volunteerGroups,
-  duplicateComplaints,
-  mergedComplaints,
-  duplicatesPrevented,
-  topDuplicateCategories,
-  duplicateSupportCount
+  volunteerGroups
 ] = await Promise.all([
     Complaint.countDocuments(match),
     Complaint.countDocuments({ ...match, status: { $in: OPEN_STATUSES } }),
@@ -179,12 +174,26 @@ export async function getDashboardSummary(query, req) {
         }
       }
     ]),
-    req.user.role === 'admin' ? Complaint.countDocuments({ $or: [{ duplicateOf: { $exists: true, $ne: null } }, { masterComplaint: { $exists: true, $ne: null } }, { isDuplicate: true }] }) : Promise.resolve(0),
-    req.user.role === 'admin' ? Complaint.countDocuments({ mergedAt: { $ne: null } }) : Promise.resolve(0),
-    req.user.role === 'admin' ? DuplicateSupport.distinct('complaint').then((items) => items.length) : Promise.resolve(0),
-    req.user.role === 'admin' ? DuplicateSupport.aggregate([{ $group: { _id: '$category', count: { $sum: 1 } } }, { $sort: { count: -1, _id: 1 } }, { $limit: 5 }, { $project: { _id: 0, category: '$_id', count: 1 } }]) : Promise.resolve([]),
-    req.user.role === 'admin' ? DuplicateSupport.countDocuments() : Promise.resolve(0)
   ]);
+
+  const [duplicateCountResult, mergedCountResult, preventedCountResult, duplicateCategoriesResult, supportCountResult] = req.user.role === 'admin'
+    ? await Promise.allSettled([
+      Complaint.countDocuments({ $or: [{ duplicateOf: { $exists: true, $ne: null } }, { masterComplaint: { $exists: true, $ne: null } }, { isDuplicate: true }] }),
+      Complaint.countDocuments({ mergedAt: { $ne: null } }),
+      DuplicateSupport.distinct('complaint').then((items) => items.length),
+      DuplicateSupport.aggregate([{ $group: { _id: '$category', count: { $sum: 1 } } }, { $sort: { count: -1, _id: 1 } }, { $limit: 5 }, { $project: { _id: 0, category: '$_id', count: 1 } }]),
+      DuplicateSupport.countDocuments()
+    ])
+    : [];
+  const optionalValue = (result, fallback) => result?.status === 'fulfilled' ? result.value : fallback;
+  if (req.user.role === 'admin' && [duplicateCountResult, mergedCountResult, preventedCountResult, duplicateCategoriesResult, supportCountResult].some((result) => result?.status === 'rejected')) {
+    console.warn('[Dashboard] duplicate metrics unavailable; complaint workflow summary will still be returned');
+  }
+  const duplicateComplaints = optionalValue(duplicateCountResult, 0);
+  const mergedComplaints = optionalValue(mergedCountResult, 0);
+  const duplicatesPrevented = optionalValue(preventedCountResult, 0);
+  const topDuplicateCategories = optionalValue(duplicateCategoriesResult, []);
+  const duplicateSupportCount = optionalValue(supportCountResult, 0);
 
   const wardStats = wardStatistics.map((ward) => ({
     ...ward,

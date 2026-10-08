@@ -1,21 +1,34 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getApiErrorMessage } from '../../api/client.js';
 import { getDuplicateComplaints, mergeDuplicateComplaint } from '../../api/complaints.js';
+import { useNotifications } from '../../context/NotificationContext.jsx';
 import { statusLabel } from '../complaints/ComplaintCard.jsx';
 
-export default function DuplicateComplaintsPanel({ topCategories = [] }) {
+export default function DuplicateComplaintsPanel() {
+  const { socket } = useNotifications();
   const [items, setItems] = useState([]);
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
   const [activeId, setActiveId] = useState('');
   const [masterIds, setMasterIds] = useState({});
 
-  async function load() {
+  const load = useCallback(async () => {
     try { setItems(await getDuplicateComplaints()); setError(''); }
-    catch (requestError) { setError(getApiErrorMessage(requestError, 'Duplicate complaints could not be loaded.')); }
-  }
+    catch (requestError) { setError(getApiErrorMessage(requestError, 'Duplicate queue is unavailable.')); }
+    finally { setIsLoading(false); }
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    void load();
+    if (!socket) return undefined;
+    socket.on('dashboard:updated', load);
+    socket.on('complaint:status', load);
+    return () => {
+      socket.off('dashboard:updated', load);
+      socket.off('complaint:status', load);
+    };
+  }, [load, socket]);
 
   const groups = useMemo(() => {
     const grouped = new Map();
@@ -42,20 +55,20 @@ export default function DuplicateComplaintsPanel({ topCategories = [] }) {
     finally { setActiveId(''); }
   }
 
+  if (isLoading || error || !items.length) return null;
+
   return <section className="panel duplicate-admin-panel">
-    <div className="panel-heading"><div><p className="eyebrow">AI duplicate review</p><h2>Duplicate groups</h2></div><span className="rejection-badge">{items.length} flagged</span></div>
-    {error && <div className="notice-banner" role="alert">{error}</div>}
-    {topCategories.length > 0 && <div className="duplicate-category-summary">{topCategories.map((item) => <span key={item.category}>{item.category.replaceAll('_', ' ')} <strong>{item.count}</strong></span>)}</div>}
+    <div className="panel-heading"><div><p className="eyebrow">Admin workflow</p><h2>Duplicate Queue</h2></div><span className="duplicate-queue-badge">{items.length} to review</span></div>
     {groups.length ? <div className="duplicate-admin-list">{groups.map((group) => <section className="duplicate-admin-group" key={group.id}>
       <div className="duplicate-group-heading"><div><strong>{group.master?.title || `Duplicate group ${group.id.slice(-6)}`}</strong><span>{group.items.length} flagged report{group.items.length === 1 ? '' : 's'} · {group.master ? 'canonical complaint' : 'unlinked reports'}</span></div><Link to={`/dashboard/complaints/${group.master?._id || group.items[0]._id}`}>Review group</Link></div>
       {group.items.map((item) => {
         const master = item.duplicateOf || item.masterComplaint || group.master;
         const recommendedId = master?._id || (typeof master === 'string' ? master : '');
         return <article className="duplicate-admin-row" key={item._id}>
-          <div className="duplicate-admin-copy"><Link to={`/dashboard/complaints/${item._id}`}>{item.title}</Link><span>{item.category?.replaceAll('_', ' ')} · {statusLabel(item.status)} · {item.supporterCount || 0} supporters · match score {item.duplicateScore || 0}%</span><small>{master ? `Recommended merge target: ${master.title || `complaint ${recommendedId}`} · confidence ${item.duplicateScore || 0}%` : 'No canonical target is linked. Review this report and its nearby matches before merging.'}</small></div>
+          <div className="duplicate-admin-copy"><Link to={`/dashboard/complaints/${item._id}`}>{item.title}</Link><span>{item.category?.replaceAll('_', ' ')} · {statusLabel(item.status)} · match score {item.duplicateScore || 0}%</span><small>{master ? `Recommended merge target: ${master.title || `complaint ${recommendedId}`} · confidence ${item.duplicateScore || 0}%` : 'No canonical target is linked. Review this report and its nearby matches before merging.'}</small></div>
           <div className="duplicate-admin-action"><input value={masterIds[item._id] ?? recommendedId} onChange={(event) => setMasterIds((current) => ({ ...current, [item._id]: event.target.value }))} placeholder="Canonical complaint ID" aria-label={`Canonical complaint ID for ${item.title}`} /><button type="button" disabled={activeId === item._id || Boolean(item.mergedAt) || !masterIds[item._id] && !recommendedId} onClick={() => merge(item)}>{item.mergedAt ? 'Merged' : activeId === item._id ? 'Merging…' : 'Merge'}</button></div>
         </article>;
       })}
-    </section>)}</div> : <div className="empty-state compact-empty"><strong>No duplicates to review</strong><p>Scored duplicate reports will appear here.</p></div>}
+    </section>)}</div> : null}
   </section>;
 }
