@@ -1,6 +1,20 @@
 import mongoose from 'mongoose';
 import { COMPLAINT_CATEGORIES } from './Complaint.js';
 
+const userLocationSchema = new mongoose.Schema({
+  type: { type: String, enum: ['Point'], required: true },
+  coordinates: {
+    type: [Number],
+    required: true,
+    validate: {
+      validator: (coordinates) => Array.isArray(coordinates) && coordinates.length === 2
+        && Number.isFinite(coordinates[0]) && coordinates[0] >= -180 && coordinates[0] <= 180
+        && Number.isFinite(coordinates[1]) && coordinates[1] >= -90 && coordinates[1] <= 90,
+      message: 'Volunteer coordinates must be [longitude, latitude] within valid ranges'
+    }
+  }
+}, { _id: false });
+
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
@@ -12,19 +26,7 @@ const userSchema = new mongoose.Schema(
     area: { type: String, trim: true, maxlength: 160 },
     city: { type: String, trim: true, maxlength: 120 },
     availability: { type: String, enum: ['available', 'limited', 'unavailable', 'full_time', 'part_time', 'weekend', 'flexible'], default: 'available', index: true },
-    location: {
-      type: { type: String, enum: ['Point'], default: 'Point' },
-      coordinates: {
-        type: [Number],
-        default: undefined,
-        validate: {
-          validator: (coordinates) => coordinates.length === 2
-            && coordinates[0] >= -180 && coordinates[0] <= 180
-            && coordinates[1] >= -90 && coordinates[1] <= 90,
-          message: 'Volunteer coordinates must be [longitude, latitude]'
-        }
-      }
-    },
+    location: { type: userLocationSchema, default: undefined },
     isActive: { type: Boolean, default: true }
   },
   { timestamps: true }
@@ -36,6 +38,6 @@ userSchema.methods.toJSON = function toJSON() {
   return user;
 };
 
-userSchema.index({ role: 1, isActive: 1, location: '2dsphere' });
+userSchema.index({ role: 1, isActive: 1, location: '2dsphere' }, { sparse: true });
 
 export default mongoose.model('User', userSchema);

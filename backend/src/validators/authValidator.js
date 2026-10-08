@@ -28,6 +28,8 @@ export function validateRegister(req, res, next) {
 	const { details, email, password } = validateCommonCredentials(req.body);
 	const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
 	const role = req.body?.role || 'citizen';
+	const requestedLocation = req.body?.location;
+	let location;
 
 	if (name.length < 2 || name.length > 100) {
 		details.push({ field: 'name', message: 'Name must be between 2 and 100 characters' });
@@ -35,11 +37,31 @@ export function validateRegister(req, res, next) {
 	if (!REGISTERED_ROLES.has(role)) {
 		details.push({ field: 'role', message: 'Role must be citizen or volunteer' });
 	}
+	if (requestedLocation !== undefined && requestedLocation !== null
+		&& (typeof requestedLocation !== 'object' || Array.isArray(requestedLocation))) {
+		details.push({ field: 'location', message: 'Location must be a GeoJSON Point' });
+	} else if (requestedLocation?.coordinates !== undefined && requestedLocation.coordinates !== null) {
+		const coordinates = requestedLocation.coordinates;
+		if (!Array.isArray(coordinates)) {
+			details.push({ field: 'location', message: 'Coordinates must contain longitude and latitude' });
+		} else if (coordinates.length === 2) {
+			const [longitude, latitude] = coordinates;
+			if ((requestedLocation.type !== undefined && requestedLocation.type !== 'Point')
+				|| !Number.isFinite(longitude) || longitude < -180 || longitude > 180
+				|| !Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
+				details.push({ field: 'location', message: 'Coordinates must be a valid GeoJSON Point [longitude, latitude]' });
+			} else {
+				location = { type: 'Point', coordinates: [longitude, latitude] };
+			}
+		} else if (coordinates.length > 2) {
+			details.push({ field: 'location', message: 'Coordinates must contain longitude and latitude' });
+		}
+	}
 	if (details.length > 0) {
 		return next(validationError(details));
 	}
 
-	req.body = { name, email, password, role };
+	req.body = { name, email, password, role, ...(location ? { location } : {}) };
 	return next();
 }
 

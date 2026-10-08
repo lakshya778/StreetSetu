@@ -83,7 +83,7 @@ const complaintSchema = new mongoose.Schema(
     priority: { type: String, enum: COMPLAINT_PRIORITIES, default: 'medium', index: true },
     status: { type: String, enum: COMPLAINT_STATUSES, default: 'submitted', index: true },
     location: {
-      type: { type: String, enum: ['Point'], required: true, default: 'Point' },
+      type: { type: String, enum: ['Point'], required: true },
       coordinates: {
         type: [Number],
         required: true,
@@ -146,7 +146,7 @@ const complaintSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-complaintSchema.index({ location: '2dsphere' });
+complaintSchema.index({ location: '2dsphere' }, { sparse: true });
 complaintSchema.index({ createdBy: 1, createdAt: -1 });
 complaintSchema.index({ status: 1, priority: 1, createdAt: -1 });
 complaintSchema.index({ wardId: 1, createdAt: -1 });

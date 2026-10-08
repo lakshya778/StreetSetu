@@ -42,11 +42,18 @@ async function createSession(user, req) {
   return { user: publicUser(user), token: accessToken, accessToken, refreshToken };
 }
 
-export async function registerUser({ name, email, password, role = 'citizen' }, req) {
+function completeLocation(location) {
+  const coordinates = location?.coordinates;
+  if (!Array.isArray(coordinates) || coordinates.length !== 2) return undefined;
+  return { type: 'Point', coordinates };
+}
+
+export async function registerUser({ name, email, password, role = 'citizen', location }, req) {
   if (role === 'admin') throw new AuthError('Admin accounts must be provisioned by an administrator', 403, 'ROLE_NOT_ALLOWED');
   try {
     const passwordHash = await bcrypt.hash(password, PASSWORD_SALT_ROUNDS);
-    const user = await User.create({ name, email, passwordHash, role });
+    const userLocation = completeLocation(location);
+    const user = await User.create({ name, email, passwordHash, role, ...(userLocation ? { location: userLocation } : {}) });
     return await createSession(user, req);
   } catch (error) {
     if (error?.code === 11000) throw new AuthError('An account with this email already exists', 409, 'EMAIL_ALREADY_EXISTS');
