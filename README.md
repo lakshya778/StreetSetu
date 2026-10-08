@@ -31,6 +31,29 @@ Civic issues are often reported across disconnected channels, with limited locat
 - Audit activity, CSV export, and PDF reports for administrators.
 - AI-assisted complaint classification through a separate Python service.
 
+## Features
+
+- **Anonymous reporting:** Citizens can mark a complaint anonymous. Public and citizen-facing views show “Anonymous” instead of the reporter's identity; authorized staff and the reporting citizen retain access according to the existing API permissions.
+- **Automatic SLA escalation:** Complaint deadlines use `SLA_HIGH_MINUTES`, `SLA_MEDIUM_MINUTES`, and `SLA_LOW_MINUTES` (defaults: 1,440 / 2,880 / 4,320 minutes). The `ESCALATION_CRON` schedule defaults to once per minute. Public overdue complaints are available at `/overdue`; an administrator can trigger a run with `POST /api/v1/admin/escalation/run`.
+- **Hindi and English:** The web interface provides an EN / हिंदी switcher and saves the language preference in browser local storage.
+- **Volunteer drives:** Authenticated users can create drives and join or leave upcoming neighbourhood activities. The dashboard shows drive dates, locations, and participant counts.
+- **Waste segregation guide and recycling map:** Search local examples across five waste categories and view sample Delhi/NCR recycling-center markers on OpenStreetMap. The sample center coordinates are illustrative and must be locally verified.
+
+### AI & Verification
+
+AI-assisted triage currently uses a lightweight TF-IDF/Logistic Regression text model to suggest complaint category and priority from the title and description; it does not perform YOLOv8 image classification. Suggestions are shown in the UI for human review. Completion evidence uses live-capture and available location/timestamp metadata checks. Visual before/after similarity is not enabled, so all completion evidence is routed to admin review (needs_review) before a complaint is marked resolved.
+
+## Known Limitations / Roadmap
+
+The following capabilities are **planned** and are not currently enabled:
+
+- YOLOv8 image classification.
+- Perceptual-hash/CNN before-and-after image similarity.
+- Predictive hotspot mapping with DBSCAN.
+- Offline support.
+- Gamification certificates.
+- Mobile parity for newer features, including volunteer drives and the segregation guide.
+
 ## Implemented capabilities
 
 | Area | Current implementation |
@@ -183,6 +206,31 @@ npm run dev
 
 The API health endpoint is `http://localhost:5000/api/health`; the API routes are under `/api/v1`. Vite prints the local frontend URL when it starts.
 
+## How to run the demo
+
+1. Install dependencies and copy the backend and frontend environment examples as described above. Set `MONGO_URI` to a reachable MongoDB database, and replace the example JWT secrets. For seeded accounts, optionally set `DEMO_SEED_PASSWORD` in `backend/.env`; the example value is intended only for a local demo.
+2. Seed (or refresh) the demo accounts and records. The script is idempotent and leaves unrelated records alone; `--reset` removes only the accounts and records marked by this seed before recreating them:
+
+   ```powershell
+   cd backend
+   npm run seed
+   # Optional: remove only this script's demo data and recreate it
+   npm run seed -- --reset
+   ```
+
+   The seed prints the login emails and password when it finishes. Default local demo credentials:
+
+   | Role | Email |
+   |---|---|
+   | Admin | `admin@streetsetu.demo` |
+   | Citizen 1 | `citizen1@streetsetu.demo` |
+   | Citizen 2 | `citizen2@streetsetu.demo` |
+
+   Unless overridden with `DEMO_SEED_PASSWORD`, the demo password is `ChangeMe-Demo-2026!`. Do not use the demo password or demo accounts in a public or production deployment.
+3. Start the backend in one terminal (`cd backend; npm run dev`) and the web frontend in another (`cd frontend; npm run dev`). For classification, follow the optional AI-service setup below, then run `python app.py` from `ai-service`; set `AI_SERVICE_URL=http://127.0.0.1:8000` in `backend/.env`.
+4. Open the Vite URL, sign in with the admin or citizen credentials above, and visit complaints, Volunteer Drives, the Segregation Guide, or the public `/overdue` page. Seeded demo data includes ten complaints (mixed lifecycle states, two overdue escalations and two anonymous reports) and two future drives with participants.
+5. To demonstrate a newly expiring SLA, set `SLA_HIGH_MINUTES=1`, `SLA_MEDIUM_MINUTES=1`, `SLA_LOW_MINUTES=1`, and `ESCALATION_CRON=* * * * *` in `backend/.env`, then restart the backend and create a complaint. Wait at most one cron interval after its deadline or invoke `POST /api/v1/admin/escalation/run` with the admin access token. The overdue seeded complaints are already available for a quick public-page demo.
+
 ### Optional AI service
 
 Install the Python dependencies and run the classifier from the repository root:
@@ -222,6 +270,9 @@ Copy the example files as above. Do not commit real secrets.
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | Optional outbound email configuration. In-app notifications do not require SMTP. |
 | `PUBLIC_APP_URL` | Optional public frontend base URL used in complaint tracking email links. |
 | `AI_SERVICE_URL`, `AI_SERVICE_TOKEN`, `AI_SERVICE_TIMEOUT_MS` | Optional classifier endpoint, shared service token, and request timeout. |
+| `SLA_HIGH_MINUTES`, `SLA_MEDIUM_MINUTES`, `SLA_LOW_MINUTES` | Complaint SLA durations by priority; used to set deadlines and subsequent escalation deadlines. |
+| `ESCALATION_CRON` | Cron schedule for automatic SLA escalation; defaults to `* * * * *`. |
+| `DEMO_SEED_PASSWORD` | Optional password used for the local demo accounts created by `npm run seed`; use a local-only value. |
 
 ### Frontend (`frontend/.env`)
 
