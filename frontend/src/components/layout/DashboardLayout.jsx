@@ -1,18 +1,20 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { NotificationProvider, useNotifications } from '../../context/NotificationContext.jsx';
 import NotificationDropdown from '../notifications/NotificationDropdown.jsx';
 import InstallAppPrompt from './InstallAppPrompt.jsx';
+import LanguageSwitcher from './LanguageSwitcher.jsx';
 
 const baseNavigation = [
-  { label: 'Overview', path: '/dashboard', icon: 'overview' },
-  { label: 'Complaints', path: '/dashboard/complaints', icon: 'complaints' },
-  { label: 'My complaints', path: '/dashboard/my-complaints', icon: 'mine' },
-  { label: 'Neighbourhoods', path: '/dashboard/neighbourhoods', icon: 'neighbourhoods' },
-  { label: 'Notifications', path: '/dashboard/notifications', icon: 'notifications' },
-  { label: 'Volunteer drives', path: '/dashboard/drives', icon: 'drives' },
-  { label: 'Segregation guide', path: '/dashboard/segregation-guide', icon: 'guide' }
+  { labelKey: 'nav.overview', path: '/dashboard', icon: 'overview' },
+  { labelKey: 'nav.complaints', path: '/dashboard/complaints', icon: 'complaints' },
+  { labelKey: 'nav.myComplaints', path: '/dashboard/my-complaints', icon: 'mine' },
+  { labelKey: 'nav.neighbourhoods', path: '/dashboard/neighbourhoods', icon: 'neighbourhoods' },
+  { labelKey: 'nav.notifications', path: '/dashboard/notifications', icon: 'notifications' },
+  { labelKey: 'nav.drives', path: '/dashboard/drives', icon: 'drives' },
+  { labelKey: 'nav.guide', path: '/dashboard/segregation-guide', icon: 'guide' }
 ];
 
 function NavigationIcon({ name }) {
@@ -30,13 +32,14 @@ function NavigationIcon({ name }) {
 }
 
 function DashboardFrame() {
+  const { t } = useTranslation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const { user, logout } = useAuth();
   const { unreadCount } = useNotifications();
   const navigate = useNavigate();
   const navigation = user?.role === 'volunteer'
-    ? [{ label: 'Volunteer dashboard', path: '/dashboard', icon: 'overview' }, ...baseNavigation.filter((item) => item.path !== '/dashboard' && item.path !== '/dashboard/my-complaints')]
+    ? [{ labelKey: 'nav.overview', path: '/dashboard', icon: 'overview' }, ...baseNavigation.filter((item) => item.path !== '/dashboard' && item.path !== '/dashboard/my-complaints')]
     : baseNavigation;
   const mobileNavigation = navigation.filter((item) => ['/dashboard', '/dashboard/complaints', '/dashboard/my-complaints', '/dashboard/notifications'].includes(item.path)).slice(0, 4);
 
@@ -52,12 +55,12 @@ function DashboardFrame() {
           <div className="brand-mark">S</div>
           <div>
             <strong>StreetSetu</strong>
-            <span>civic operations</span>
+            <span>{t('nav.civicOperations', 'civic operations')}</span>
           </div>
-          <button className="icon-button sidebar-close" onClick={() => setSidebarOpen(false)} aria-label="Close navigation">×</button>
+          <button className="icon-button sidebar-close" onClick={() => setSidebarOpen(false)} aria-label={t('nav.closeNavigation')}>×</button>
         </div>
-        <div className="sidebar-section-label">Workspace</div>
-        <nav className="sidebar-nav" aria-label="Main navigation">
+        <div className="sidebar-section-label">{t('nav.workspace')}</div>
+        <nav className="sidebar-nav" aria-label={t('nav.quickNavigation')}>
           {navigation.map((item) => (
             <NavLink
               key={item.path}
@@ -67,37 +70,38 @@ function DashboardFrame() {
               className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
             >
               <span className="nav-icon"><NavigationIcon name={item.icon} /></span>
-              {item.label}
+              {t(item.labelKey)}
             </NavLink>
           ))}
         </nav>
         <div className="sidebar-footer">
           <div className="help-panel">
             <span className="help-dot" />
-            <div><strong>System healthy</strong><small>All services responding</small></div>
+            <div><strong>{t('nav.systemHealthy')}</strong><small>{t('nav.servicesResponding')}</small></div>
           </div>
-          <button className="sidebar-link logout-link" onClick={handleLogout}><span className="nav-icon"><NavigationIcon name="logout" /></span>Sign out</button>
+          <button className="sidebar-link logout-link" onClick={handleLogout}><span className="nav-icon"><NavigationIcon name="logout" /></span>{t('nav.signOut')}</button>
         </div>
       </aside>
-      {sidebarOpen && <button className="sidebar-scrim" onClick={() => setSidebarOpen(false)} aria-label="Close navigation" />}
+      {sidebarOpen && <button className="sidebar-scrim" onClick={() => setSidebarOpen(false)} aria-label={t('nav.closeNavigation')} />}
       <div className="main-column">
         <header className="topbar">
-          <button className="icon-button menu-button" onClick={() => setSidebarOpen(true)} aria-label="Open navigation"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 6h16M4 12h16M4 18h16" /></svg></button>
-          <div className="topbar-brand"><div className="brand-mark">S</div><div className="breadcrumb"><strong>StreetSetu</strong><b>/</b><span>Neighbourhood action</span></div></div>
+          <button className="icon-button menu-button" onClick={() => setSidebarOpen(true)} aria-label={t('nav.openNavigation')}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 6h16M4 12h16M4 18h16" /></svg></button>
+          <div className="topbar-brand"><div className="brand-mark">S</div><div className="breadcrumb"><strong>StreetSetu</strong><b>/</b><span>{t('nav.brandSubtitle')}</span></div></div>
           <div className="topbar-actions">
+            <LanguageSwitcher />
             <InstallAppPrompt />
-            <div className="notification-anchor"><button className="notification-button" onClick={() => setNotificationsOpen((open) => !open)} aria-label={`View notifications${unreadCount ? `, ${unreadCount} unread` : ''}`} aria-expanded={notificationsOpen}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M10 21h4" /></svg>{unreadCount > 0 && <b className="notification-badge">{unreadCount > 99 ? '99+' : unreadCount}</b>}</button>{notificationsOpen && <NotificationDropdown onClose={() => setNotificationsOpen(false)} />}</div>
+            <div className="notification-anchor"><button className="notification-button" onClick={() => setNotificationsOpen((open) => !open)} aria-label={unreadCount ? t('nav.notificationsUnread', { count: unreadCount }) : t('nav.notificationsView')} aria-expanded={notificationsOpen}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M10 21h4" /></svg>{unreadCount > 0 && <b className="notification-badge">{unreadCount > 99 ? '99+' : unreadCount}</b>}</button>{notificationsOpen && <NotificationDropdown onClose={() => setNotificationsOpen(false)} />}</div>
             <div className="user-chip">
               <div className="avatar">{user?.name?.slice(0, 1).toUpperCase() || 'U'}</div>
-              <div className="user-copy"><strong>{user?.name || 'User'}</strong><span>{user?.role || 'citizen'}</span></div>
+              <div className="user-copy"><strong>{user?.name || 'User'}</strong><span>{user?.role === 'admin' ? t('nav.roleAdmin') : user?.role === 'volunteer' ? t('nav.roleVolunteer') : t('nav.roleCitizen')}</span></div>
             </div>
           </div>
         </header>
         <main className="page-content"><Outlet /></main>
-        <nav className="mobile-bottom-nav" aria-label="Quick navigation">
+        <nav className="mobile-bottom-nav" aria-label={t('nav.quickNavigation')}>
           {mobileNavigation.map((item) => (
             <NavLink key={item.path} to={item.path} end={item.path === '/dashboard'} className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}>
-              <NavigationIcon name={item.icon} /><span>{item.label === 'Volunteer dashboard' ? 'Overview' : item.label}</span>
+              <NavigationIcon name={item.icon} /><span>{t(item.labelKey)}</span>
             </NavLink>
           ))}
         </nav>

@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { getApiErrorMessage } from '../../api/client.js';
 import { getComplaints } from '../../api/complaints.js';
 import { statusLabel } from './ComplaintCard.jsx';
 
 export default function RejectedComplaintsTable() {
+  useTranslation();
   const [result, setResult] = useState({ items: [], total: 0 });
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);

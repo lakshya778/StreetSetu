@@ -592,6 +592,16 @@ tbody tr:hover { background: #F8FAF6; }
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
 
+.language-switcher { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 4px; min-height: 40px; border: 1px solid var(--color-border); border-radius: 999px; padding: 3px; color: var(--color-text-muted); background: var(--color-card); font-size: 11px; font-weight: 700; }
+.language-switcher button { min-width: 40px; min-height: 32px; border: 0; border-radius: 999px; padding: 4px 8px; color: inherit; background: transparent; font: inherit; cursor: pointer; }
+.language-switcher button:hover, .language-switcher button:focus-visible { color: var(--color-primary-dark); background: var(--color-primary-soft); outline: none; }
+.language-switcher button.active { color: var(--color-primary-dark); background: var(--color-brand-lime); }
+.auth-visual > .language-switcher { position: absolute; z-index: 4; top: 24px; right: max(24px, calc((100vw - 1180px) / 2)); border-color: rgb(255 255 255 / 28%); color: #fff; background: rgb(255 255 255 / 10%); }
+.auth-visual > .language-switcher button.active { color: var(--color-primary-dark); }
+@media (max-width: 767px) {
+  .auth-visual > .language-switcher { top: max(18px, env(safe-area-inset-top)); right: 18px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }

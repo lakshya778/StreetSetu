@@ -1,17 +1,19 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { getApiErrorMessage } from '../api/client.js';
 import { getPublicOverdueComplaints } from '../api/public.js';
 import PublicHeader from '../components/layout/PublicHeader.jsx';
 
-function formatOverdue(milliseconds) {
+function formatOverdue(milliseconds, t) {
   const minutes = Math.max(0, Math.floor(milliseconds / 60000));
-  if (minutes < 60) return `${minutes} min overdue`;
+  if (minutes < 60) return t('overdue.minutes', { count: minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} hr overdue`;
-  return `${Math.floor(hours / 24)} days overdue`;
+  if (hours < 24) return t('overdue.hours', { count: hours });
+  return t('overdue.days', { count: Math.floor(hours / 24) });
 }
 
 export default function OverdueComplaintsPage() {
+  const { t } = useTranslation();
   const [complaints, setComplaints] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -20,7 +22,7 @@ export default function OverdueComplaintsPage() {
     let active = true;
     getPublicOverdueComplaints()
       .then((items) => { if (active) setComplaints(items); })
-      .catch((requestError) => { if (active) setError(getApiErrorMessage(requestError, 'Overdue complaints could not be loaded.')); })
+      .catch((requestError) => { if (active) setError(getApiErrorMessage(requestError, t('overdue.loadError'))); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, []);
@@ -29,17 +31,17 @@ export default function OverdueComplaintsPage() {
     <PublicHeader />
     <main className="public-content overdue-page">
       <section className="public-hero">
-        <p className="eyebrow">Service accountability</p>
-        <h1>Overdue complaints</h1>
-        <p>Reports that have crossed their service deadline and been escalated for attention.</p>
+        <p className="eyebrow">{t('overdue.kicker')}</p>
+        <h1>{t('overdue.title')}</h1>
+        <p>{t('overdue.subtitle')}</p>
       </section>
-      {error && <div className="notice-banner" role="alert">{error} <button onClick={() => window.location.reload()}>Retry</button></div>}
-      {loading ? <div className="overdue-message" role="status">Loading overdue reports…</div>
+      {error && <div className="notice-banner" role="alert">{error} <button onClick={() => window.location.reload()}>{t('overdue.retry')}</button></div>}
+      {loading ? <div className="overdue-message" role="status">{t('overdue.loading')}</div>
         : complaints.length ? <div className="overdue-list">{complaints.map((complaint) => <article className="panel overdue-card" key={complaint._id}>
-          <div className="overdue-card-heading"><div><p className="eyebrow">{complaint.category?.replaceAll('_', ' ') || 'Civic report'}</p><h2>{complaint.title}</h2></div><span className="overdue-level">{complaint.escalationTarget}</span></div>
-          <div className="overdue-card-meta"><span>Reported by {complaint.reporter?.name || (complaint.isAnonymous ? 'Anonymous' : 'Reporter')}</span><strong>{formatOverdue(complaint.timeOverdueMs)}</strong></div>
+          <div className="overdue-card-heading"><div><p className="eyebrow">{t(`category.${complaint.category}`, { defaultValue: complaint.category?.replaceAll('_', ' ') || t('overdue.categoryFallback') })}</p><h2>{complaint.title}</h2></div><span className="overdue-level">{t(`overdue.level${complaint.escalationLevel}`)}</span></div>
+          <div className="overdue-card-meta"><span>{t('overdue.reportedBy', { name: complaint.isAnonymous ? t('overdue.anonymous') : complaint.reporter?.name || t('overdue.reporter') })}</span><strong>{formatOverdue(complaint.timeOverdueMs, t)}</strong></div>
         </article>)}</div>
-          : <div className="panel overdue-empty"><h2>No overdue complaints</h2><p>All currently tracked reports are within their service deadlines.</p></div>}
+          : <div className="panel overdue-empty"><h2>{t('overdue.emptyTitle')}</h2><p>{t('overdue.emptyMessage')}</p></div>}
     </main>
   </div>;
 }

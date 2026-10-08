@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { statusLabel } from './ComplaintCard.jsx';
 
 export default function DuplicateWarningModal({
@@ -13,6 +14,7 @@ export default function DuplicateWarningModal({
   busy = false,
   supported = false
 }) {
+  useTranslation();
   useEffect(() => {
     if (!candidate) return undefined;
     function handleKeyDown(event) {

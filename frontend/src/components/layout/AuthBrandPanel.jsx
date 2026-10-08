@@ -1,14 +1,17 @@
+import { useTranslation } from 'react-i18next';
+import LanguageSwitcher from './LanguageSwitcher.jsx';
+
 const featurePoints = [
   {
-    title: 'Report with live geotagged photo',
+    titleKey: 'auth.featurePhoto',
     icon: <><path d="M4 7h3l1.5-2h7L17 7h3v12H4z" /><circle cx="12" cy="13" r="3" /></>
   },
   {
-    title: 'AI-assisted triage',
+    titleKey: 'auth.featureTriage',
     icon: <><path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1m0-12.8-2.1 2.1m-8.6 8.6-2.1 2.1" /><circle cx="12" cy="12" r="4" /></>
   },
   {
-    title: 'Transparent resolution',
+    titleKey: 'auth.featureResolution',
     icon: <><path d="m5 12 4 4L19 6" /><path d="M20 12a8 8 0 1 1-2.3-5.7" /></>
   }
 ];
@@ -18,8 +21,10 @@ function BrandMark() {
 }
 
 export default function AuthBrandPanel() {
+  const { t } = useTranslation();
   return (
     <section className="auth-visual" aria-labelledby="auth-brand-heading">
+      <LanguageSwitcher />
       <div className="auth-hero-art" aria-hidden="true">
         <svg viewBox="0 0 520 260" fill="none">
           <path d="M0 218h520" stroke="currentColor" strokeWidth="2" />
@@ -32,18 +37,18 @@ export default function AuthBrandPanel() {
       </div>
       <div className="auth-visual-top"><BrandMark /><strong>StreetSetu</strong></div>
       <div className="auth-visual-copy">
-        <p className="eyebrow">Neighbourhood intelligence</p>
-        <h2 id="auth-brand-heading">Make every street <em>count.</em></h2>
-        <p className="auth-hero-subtitle">A clearer path from a neighbourhood report to accountable action.</p>
+        <p className="eyebrow">{t('auth.brandKicker')}</p>
+        <h2 id="auth-brand-heading">{t('auth.brandHeading')}</h2>
+        <p className="auth-hero-subtitle">{t('auth.brandSubtitle')}</p>
         <ul className="auth-feature-list">
           {featurePoints.map((feature) => (
-            <li key={feature.title}>
+            <li key={feature.titleKey}>
               <span className="auth-feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{feature.icon}</svg></span>
-              <span>{feature.title}</span>
+              <span>{t(feature.titleKey)}</span>
             </li>
           ))}
         </ul>
-        <div className="auth-quote-strip"><span>Citizen report</span><i aria-hidden="true">→</i><strong>Accountable action</strong></div>
+        <div className="auth-quote-strip"><span>{t('auth.citizenReport')}</span><i aria-hidden="true">→</i><strong>{t('auth.accountableAction')}</strong></div>
       </div>
     </section>
   );

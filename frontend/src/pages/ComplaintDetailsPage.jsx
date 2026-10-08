@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/client.js';
 import { checkComplaintDuplicates, getComplaint, submitComplaintFeedback, supportDuplicateComplaint, updateComplaintStatus } from '../api/complaints.js';
@@ -24,6 +25,7 @@ const ADMIN_TRANSITIONS = {
 };
 
 export default function ComplaintDetailsPage() {
+  useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();

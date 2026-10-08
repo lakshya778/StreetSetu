@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { getApiErrorMessage } from '../api/client.js';
@@ -16,10 +17,10 @@ import PageHeader from '../components/layout/PageHeader.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useNotifications } from '../context/NotificationContext.jsx';
 import SkeletonList from '../components/layout/SkeletonList.jsx';
+import { statusLabel } from '../components/complaints/ComplaintCard.jsx';
 
 const LiveCameraCapture = lazy(() => import('../components/media/LiveCameraCapture.jsx'));
 const RESOLVED_STATUSES = ['resolved'];
-const STATUS_LABELS = { assigned: 'Assigned', in_progress: 'In Progress', needs_review: 'Needs Review', resolved: 'Resolved', rejected: 'Rejected' };
 const WORKFLOW_GROUPS = [
   { key: 'assigned', label: 'Assigned', tone: 'assignment-amber' },
   { key: 'in_progress', label: 'In progress', tone: 'assignment-blue' },
@@ -28,9 +29,8 @@ const WORKFLOW_GROUPS = [
   { key: 'rejected', label: 'Rejected', tone: 'assignment-red' }
 ];
 
-function statusLabel(status) { return STATUS_LABELS[status] || status.replaceAll('_', ' '); }
-
 export default function VolunteerDashboardPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { socket } = useNotifications();
   const [assignments, setAssignments] = useState([]);
@@ -169,43 +169,44 @@ export default function VolunteerDashboardPage() {
   }, [analytics, assignments, assignmentMeta.total]);
 
   const metricCards = [
-    { label: 'My assignments', value: metrics.total, description: 'All assigned complaints', tone: 'metric-dark' },
-    { label: 'Resolved', value: metrics.resolved, description: 'Completed assignments', tone: '' },
-    { label: 'Average completion', value: metrics.averageCompletionDays == null ? '—' : `${metrics.averageCompletionDays} days`, description: 'Reported to resolved', tone: '' },
-    { label: 'Route efficiency', value: `${metrics.routeEfficiencyScore}%`, description: 'Completed complaints per km score', tone: '' },
-    { label: 'Resolution rate', value: `${metrics.rate}%`, description: 'Resolved / assignments excluding rejected', tone: 'metric-lime' },
-    { label: 'Average citizen rating', value: metrics.averageRating == null ? '—' : `${metrics.averageRating} / 5`, description: `${metrics.ratingCount} citizen ratings`, tone: '' },
-    { label: 'Volunteer ranking', value: metrics.rank ? `#${metrics.rank} / ${metrics.volunteerCount}` : '—', description: 'Ranked by resolution rate', tone: 'metric-dark' }
+    { label: t('dashboard.myAssignments'), value: metrics.total, description: t('dashboard.allAssigned'), tone: 'metric-dark' },
+    { label: t('dashboard.resolved'), value: metrics.resolved, description: t('dashboard.completedAssignments'), tone: '' },
+    { label: t('dashboard.averageCompletionDays'), value: metrics.averageCompletionDays == null ? '—' : t('dashboard.days', { count: metrics.averageCompletionDays }), description: t('dashboard.reportedToResolved'), tone: '' },
+    { label: t('dashboard.routeEfficiency'), value: `${metrics.routeEfficiencyScore}%`, description: t('dashboard.completedPerKm'), tone: '' },
+    { label: t('dashboard.resolutionRateLabel'), value: `${metrics.rate}%`, description: t('dashboard.resolvedAssignments'), tone: 'metric-lime' },
+    { label: t('dashboard.citizenRating'), value: metrics.averageRating == null ? '—' : `${metrics.averageRating} / 5`, description: t('dashboard.citizenRatings', { count: metrics.ratingCount }), tone: '' },
+    { label: t('dashboard.volunteerRanking'), value: metrics.rank ? `#${metrics.rank} / ${metrics.volunteerCount}` : '—', description: t('dashboard.rankedResolution'), tone: 'metric-dark' }
   ];
   const filteredAssignments = assignments.filter(({ complaint }) => !assignmentSearch || `${complaint?.title || ''} ${complaint?.description || ''} ${complaint?.category || ''} ${complaint?.address || ''}`.toLowerCase().includes(assignmentSearch.toLowerCase()));
   const assignedComplaints = filteredAssignments.map((assignment) => assignment.complaint).filter(Boolean);
 
   return <div className="volunteer-page">
-    <PageHeader kicker="Volunteer workspace" title={`Good morning, ${user?.name?.split(' ')[0] || 'volunteer'}.`} subtitle="Your assigned street actions, in one clear view." actions={<button className="outline-button" onClick={loadAssignments}>Refresh <span>↻</span></button>} />
-    {error && <div className="notice-banner">{error}<button onClick={loadAssignments}>Retry</button></div>}
+    <PageHeader kicker={t('dashboard.volunteerKicker')} title={t('dashboard.volunteerGreeting', { name: user?.name?.split(' ')[0] || t('dashboard.volunteerFallback') })} subtitle={t('dashboard.volunteerSubtitle')} actions={<button className="outline-button" onClick={loadAssignments}>{t('dashboard.refreshAssignments')} <span>↻</span></button>} />
+    {error && <div className="notice-banner">{error}<button onClick={loadAssignments}>{t('dashboard.retry')}</button></div>}
     <div className="volunteer-metrics">{metricCards.map((card) => <article className={`volunteer-metric ${card.tone}`} key={card.label}><span>{card.label}</span><strong>{isLoading ? '—' : card.value}</strong><small>{card.description}</small></article>)}</div>
     <VolunteerProfileForm user={user} onSaved={refreshRoute} />
     <div className="volunteer-route-grid"><RouteSummaryCard route={route} isLoading={isLoading} /><VolunteerRouteMap route={route} /></div>
-    <section className="panel volunteer-map-panel"><div className="panel-heading"><div><p className="eyebrow">Field coordination</p><h2>Assigned complaints nearby</h2></div></div><ComplaintMap complaints={assignedComplaints} className="volunteer-assignment-map" /></section>
+    <section className="panel volunteer-map-panel"><div className="panel-heading"><div><p className="eyebrow">{t('dashboard.fieldCoordination')}</p><h2>{t('dashboard.assignedNearby')}</h2></div></div><ComplaintMap complaints={assignedComplaints} className="volunteer-assignment-map" /></section>
     <div className="volunteer-charts-grid">
-      <section className="panel"><div className="panel-heading"><div><p className="eyebrow">Personal performance</p><h2>Assigned complaint trend</h2></div></div><div className="dashboard-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={analytics.monthlyTrends || []}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="month" /><YAxis allowDecimals={false} /><Tooltip /><Legend /><Bar dataKey="submitted" name="Assigned reports" fill="#83a978" radius={[4, 4, 0, 0]} /><Bar dataKey="rejected" name="Rejected" fill="#d27a70" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></div></section>
-      <section className="panel"><div className="panel-heading"><div><p className="eyebrow">Monthly resolution</p><h2>Resolved complaints</h2></div></div><div className="dashboard-chart"><ResponsiveContainer width="100%" height="100%"><AreaChart data={analytics.resolutionTrends || []}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="month" /><YAxis allowDecimals={false} /><Tooltip /><Area type="monotone" dataKey="resolved" name="Resolved" stroke="#5e896b" fill="#dcebd6" strokeWidth={2} /></AreaChart></ResponsiveContainer></div></section>
+      <section className="panel"><div className="panel-heading"><div><p className="eyebrow">{t('dashboard.personalPerformance')}</p><h2>{t('dashboard.assignmentTrend')}</h2></div></div><div className="dashboard-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={analytics.monthlyTrends || []}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="month" /><YAxis allowDecimals={false} /><Tooltip /><Legend /><Bar dataKey="submitted" name={t('dashboard.assignedReports')} fill="#83a978" radius={[4, 4, 0, 0]} /><Bar dataKey="rejected" name={t('dashboard.rejected')} fill="#d27a70" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></div></section>
+      <section className="panel"><div className="panel-heading"><div><p className="eyebrow">{t('dashboard.monthlyResolution')}</p><h2>{t('dashboard.resolved')}</h2></div></div><div className="dashboard-chart"><ResponsiveContainer width="100%" height="100%"><AreaChart data={analytics.resolutionTrends || []}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="month" /><YAxis allowDecimals={false} /><Tooltip /><Area type="monotone" dataKey="resolved" name={t('dashboard.resolved')} stroke="#5e896b" fill="#dcebd6" strokeWidth={2} /></AreaChart></ResponsiveContainer></div></section>
     </div>
-    <div className="volunteer-assignment-toolbar"><label>Search assignments<input value={assignmentSearch} onChange={(event) => setAssignmentSearch(event.target.value)} placeholder="Title, category, address" /></label></div>
+    <div className="volunteer-assignment-toolbar"><label>{t('dashboard.searchAssignments')}<input value={assignmentSearch} onChange={(event) => setAssignmentSearch(event.target.value)} placeholder={t('dashboard.assignmentSearchPlaceholder')} /></label></div>
     <div className="assignment-groups">{WORKFLOW_GROUPS.map((group) => {
       const items = filteredAssignments.filter(({ complaint }) => complaint?.status === group.key);
       return <section className="assignment-section" key={group.key}>
-        <div className="assignment-section-heading"><div><p className="eyebrow">Workflow</p><h2>{group.label}</h2></div><span className={`assignment-count ${group.tone}`}>{items.length}</span></div>
+        <div className="assignment-section-heading"><div><p className="eyebrow">{t('dashboard.workflow')}</p><h2>{t(`status.${group.key}`)}</h2></div><span className={`assignment-count ${group.tone}`}>{items.length}</span></div>
         {isLoading ? <SkeletonList rows={2} /> : items.length
           ? <div className="assignment-list">{items.map((assignment) => <AssignmentCard key={assignment._id} assignment={assignment} evidenceFiles={evidenceFiles[assignment.complaint?._id] || []} uploadProgress={uploadProgress[assignment.complaint?._id]} onEvidenceChange={(files) => setEvidenceFiles((current) => ({ ...current, [assignment.complaint._id]: files }))} updatingId={updatingId} onStatusChange={handleStatusChange} onAssignmentResponse={handleAssignmentResponse} />)}</div>
-          : <div className="assignment-empty">No {group.label.toLowerCase()} complaints.</div>}
+          : <div className="assignment-empty">{t('dashboard.noStatusComplaints', { status: t(`status.${group.key}`).toLowerCase() })}</div>}
       </section>;
     })}</div>
-    {assignmentMeta.pages > 1 && <div className="pagination"><button disabled={assignmentMeta.page <= 1} onClick={() => setAssignmentMeta((current) => ({ ...current, page: current.page - 1 }))}>← Previous assignments</button><span>Page {assignmentMeta.page} of {assignmentMeta.pages} · {assignmentMeta.total} total</span><button disabled={assignmentMeta.page >= assignmentMeta.pages} onClick={() => setAssignmentMeta((current) => ({ ...current, page: current.page + 1 }))}>Next assignments →</button></div>}
+    {assignmentMeta.pages > 1 && <div className="pagination"><button disabled={assignmentMeta.page <= 1} onClick={() => setAssignmentMeta((current) => ({ ...current, page: current.page - 1 }))}>{t('dashboard.previousAssignments')}</button><span>{t('complaints.page', { page: assignmentMeta.page, pages: assignmentMeta.pages })} · {t('dashboard.total', { count: assignmentMeta.total })}</span><button disabled={assignmentMeta.page >= assignmentMeta.pages} onClick={() => setAssignmentMeta((current) => ({ ...current, page: current.page + 1 }))}>{t('dashboard.nextAssignments')}</button></div>}
   </div>;
 }
 
 function AssignmentCard({ assignment, evidenceFiles, uploadProgress, onEvidenceChange, updatingId, onStatusChange, onAssignmentResponse }) {
+  useTranslation();
   const complaint = assignment.complaint;
   const isResolved = RESOLVED_STATUSES.includes(complaint.status);
   const needsReview = complaint.status === 'needs_review';

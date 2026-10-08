@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { getApiErrorMessage } from '../../api/client.js';
 import { getDuplicateComplaints, mergeDuplicateComplaint } from '../../api/complaints.js';
@@ -6,6 +7,7 @@ import { useNotifications } from '../../context/NotificationContext.jsx';
 import { statusLabel } from '../complaints/ComplaintCard.jsx';
 
 export default function DuplicateComplaintsPanel() {
+  useTranslation();
   const { socket } = useNotifications();
   const [items, setItems] = useState([]);
   const [error, setError] = useState('');

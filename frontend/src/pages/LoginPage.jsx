@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import AuthBrandPanel from '../components/layout/AuthBrandPanel.jsx';
 
 export default function LoginPage() {
+  const { t } = useTranslation();
   const { user, login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -27,7 +29,7 @@ export default function LoginPage() {
       await login(form);
       navigate(location.state?.from || '/dashboard', { replace: true });
     } catch (requestError) {
-      setError(getApiErrorMessage(requestError, 'We could not sign you in. Check your details and try again.'));
+      setError(getApiErrorMessage(requestError, t('auth.signInError')));
     } finally {
       setIsSubmitting(false);
     }
@@ -38,16 +40,16 @@ export default function LoginPage() {
       <AuthBrandPanel />
       <section className="auth-panel">
         <div className="auth-form-wrap">
-          <p className="eyebrow">Welcome back</p>
-          <h1>Sign in to your workspace</h1>
-          <p className="auth-subtitle">Pick up where your neighbourhood left off.</p>
+          <p className="eyebrow">{t('auth.welcomeBack')}</p>
+          <h1>{t('auth.signInTitle')}</h1>
+          <p className="auth-subtitle">{t('auth.signInSubtitle')}</p>
           <form onSubmit={handleSubmit} className="auth-form">
-            <label>Email address<input name="email" type="email" autoComplete="email" value={form.email} onChange={updateField} placeholder="you@example.com" required /></label>
-            <label>Password<div className="password-field"><input name="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" value={form.password} onChange={updateField} placeholder="Enter your password" required minLength="8" /><button className="password-toggle" type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword}>{showPassword ? 'Hide' : 'Show'}</button></div></label>
+            <label>{t('auth.email')}<input name="email" type="email" autoComplete="email" value={form.email} onChange={updateField} placeholder={t('auth.emailPlaceholder')} required /></label>
+            <label>{t('auth.password')}<div className="password-field"><input name="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" value={form.password} onChange={updateField} placeholder={t('auth.passwordPlaceholder')} required minLength="8" /><button className="password-toggle" type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')} aria-pressed={showPassword}>{showPassword ? t('auth.hidePassword') : t('auth.showPassword')}</button></div></label>
             {error && <div className="form-error" role="alert">{error}</div>}
-            <button className="primary-button" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Signing in...' : 'Sign in'} <span>→</span></button>
+            <button className="primary-button" type="submit" disabled={isSubmitting}>{isSubmitting ? t('auth.signingIn') : t('nav.signIn')} <span>→</span></button>
           </form>
-          <p className="auth-switch">New to StreetSetu? <Link to="/register">Create an account</Link> · <Link to="/transparency">City transparency</Link></p>
+          <p className="auth-switch">{t('auth.newHere')} <Link to="/register">{t('auth.createAccount')}</Link> · <Link to="/transparency">{t('auth.cityTransparency')}</Link></p>
         </div>
       </section>
     </main>

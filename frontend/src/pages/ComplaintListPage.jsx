@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/client.js';
 import { complaintCategories, complaintListCacheKey, getComplaints } from '../api/complaints.js';
-import ComplaintCard from '../components/complaints/ComplaintCard.jsx';
+import ComplaintCard, { statusLabel } from '../components/complaints/ComplaintCard.jsx';
 import ComplaintMap from '../components/maps/LazyComplaintMap.jsx';
 import SkeletonList from '../components/layout/SkeletonList.jsx';
 import useDebouncedValue from '../hooks/useDebouncedValue.js';
@@ -12,6 +13,7 @@ import StreetEmptyIllustration from '../components/layout/StreetEmptyIllustratio
 const emptyResult = { items: [], total: 0, pages: 1, page: 1 };
 
 export default function ComplaintListPage({ mine = false }) {
+  const { t } = useTranslation();
   const [result, setResult] = useState(emptyResult);
   const [filters, setFilters] = useState({ status: '', category: '', priority: '', search: '', page: 1, limit: 12 });
   const [searchInput, setSearchInput] = useState('');
@@ -24,7 +26,7 @@ export default function ComplaintListPage({ mine = false }) {
     setIsLoading(true);
     getComplaints(filters)
       .then((data) => { if (mounted) setResult(data); })
-      .catch((requestError) => { if (mounted) setError(getApiErrorMessage(requestError, 'Complaints could not be loaded.')); })
+      .catch((requestError) => { if (mounted) setError(getApiErrorMessage(requestError, t('complaints.loadError'))); })
       .finally(() => { if (mounted) setIsLoading(false); });
     return () => { mounted = false; };
   }, [filters]);
@@ -37,7 +39,7 @@ export default function ComplaintListPage({ mine = false }) {
     const key = complaintListCacheKey(filters);
     const handleRefresh = (event) => { if (event.detail.key === key) setResult(event.detail.data); };
     const handleRefreshError = (event) => {
-      if (event.detail.key === key) setError(getApiErrorMessage(event.detail.error, 'Complaints could not be refreshed.'));
+      if (event.detail.key === key) setError(getApiErrorMessage(event.detail.error, t('complaints.refreshError')));
     };
     window.addEventListener('streetsetu:complaints-refreshed', handleRefresh);
     window.addEventListener('streetsetu:complaints-refresh-error', handleRefreshError);
@@ -54,15 +56,15 @@ export default function ComplaintListPage({ mine = false }) {
     }
     setFilters((current) => ({ ...current, [event.target.name]: event.target.value, page: 1 }));
   }
-  const title = mine ? 'My complaints' : 'Complaint management';
-  const description = mine ? 'Track the issues you have raised and their progress.' : 'Review, filter, and coordinate neighbourhood reports.';
+  const title = mine ? t('complaints.myTitle') : t('complaints.managementTitle');
+  const description = mine ? t('complaints.mySubtitle') : t('complaints.managementSubtitle');
 
   return <div className="complaints-page">
-    <PageHeader kicker="Civic reports" title={title} subtitle={description} actions={<Link className="primary-button compact-button" to="/dashboard/complaints/new">New complaint <span>+</span></Link>} />
-    <div className="complaint-toolbar"><div className="filter-label">{result.total || 0} reports</div><input name="search" value={searchInput} onChange={updateFilter} placeholder="Search title, details, address" aria-label="Search reports" /><select name="status" value={filters.status} onChange={updateFilter}><option value="">All statuses</option>{['submitted', 'under_review', 'assigned', 'in_progress', 'resolved', 'closed', 'rejected'].map((status) => <option key={status} value={status}>{status.replaceAll('_', ' ')}</option>)}</select><select name="category" value={filters.category} onChange={updateFilter}><option value="">All categories</option>{complaintCategories.map((category) => <option key={category} value={category}>{category.replaceAll('_', ' ')}</option>)}</select><select name="priority" value={filters.priority} onChange={updateFilter}><option value="">All priorities</option>{['low', 'medium', 'high', 'critical'].map((priority) => <option key={priority} value={priority}>{priority}</option>)}</select></div>
+    <PageHeader kicker={t('complaints.kicker')} title={title} subtitle={description} actions={<Link className="primary-button compact-button" to="/dashboard/complaints/new">{t('complaints.new')} <span>+</span></Link>} />
+    <div className="complaint-toolbar"><div className="filter-label">{t('complaints.reportsCount', { count: result.total || 0 })}</div><input name="search" value={searchInput} onChange={updateFilter} placeholder={t('complaints.searchPlaceholder')} aria-label={t('complaints.searchPlaceholder')} /><select name="status" value={filters.status} onChange={updateFilter}><option value="">{t('complaints.allStatuses')}</option>{['submitted', 'under_review', 'assigned', 'in_progress', 'needs_review', 'resolved', 'closed', 'rejected'].map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}</select><select name="category" value={filters.category} onChange={updateFilter}><option value="">{t('complaints.allCategories')}</option>{complaintCategories.map((category) => <option key={category} value={category}>{t(`category.${category}`)}</option>)}</select><select name="priority" value={filters.priority} onChange={updateFilter}><option value="">{t('complaints.allPriorities')}</option>{['low', 'medium', 'high', 'critical'].map((priority) => <option key={priority} value={priority}>{t(`priority.${priority}`)}</option>)}</select></div>
     {error && <div className="notice-banner">{error}</div>}
     {!isLoading && result.items.length > 0 && <ComplaintMap complaints={result.items} className="complaints-overview-map" />}
-    {isLoading ? <SkeletonList rows={6} /> : result.items.length ? <div className="complaint-grid">{result.items.map((complaint) => <ComplaintCard key={complaint._id} complaint={complaint} />)}</div> : <div className="empty-state complaint-empty"><StreetEmptyIllustration /><strong>No complaints found</strong><p>Try adjusting your filters or report an issue in your neighbourhood.</p><Link className="primary-button compact-button" to="/dashboard/complaints/new">Report an issue <span>→</span></Link></div>}
-    {result.pages > 1 && <div className="pagination"><button disabled={filters.page <= 1} onClick={() => setFilters((current) => ({ ...current, page: current.page - 1 }))}>← Previous</button><span>Page {result.page} of {result.pages}</span><button disabled={filters.page >= result.pages} onClick={() => setFilters((current) => ({ ...current, page: current.page + 1 }))}>Next →</button></div>}
+    {isLoading ? <SkeletonList rows={6} /> : result.items.length ? <div className="complaint-grid">{result.items.map((complaint) => <ComplaintCard key={complaint._id} complaint={complaint} />)}</div> : <div className="empty-state complaint-empty"><StreetEmptyIllustration /><strong>{t('complaints.notFound')}</strong><p>{t('complaints.adjustFilters')}</p><Link className="primary-button compact-button" to="/dashboard/complaints/new">{t('complaints.reportIssue')} <span>→</span></Link></div>}
+    {result.pages > 1 && <div className="pagination"><button disabled={filters.page <= 1} onClick={() => setFilters((current) => ({ ...current, page: current.page - 1 }))}>{t('complaints.previous')}</button><span>{t('complaints.page', { page: result.page, pages: result.pages })}</span><button disabled={filters.page >= result.pages} onClick={() => setFilters((current) => ({ ...current, page: current.page + 1 }))}>{t('complaints.next')}</button></div>}
   </div>;
 }

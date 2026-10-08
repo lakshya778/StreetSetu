@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import api, { getApiErrorMessage } from '../../api/client.js';
 import { getComplaints } from '../../api/complaints.js';
@@ -6,29 +7,12 @@ import { useNotifications } from '../../context/NotificationContext.jsx';
 import DuplicateComplaintsPanel from './DuplicateComplaintsPanel.jsx';
 import SkeletonList from '../layout/SkeletonList.jsx';
 import PageHeader from '../layout/PageHeader.jsx';
-
-const STATUS_LABELS = {
-  submitted: 'Submitted',
-  under_review: 'Under Review',
-  assigned: 'Assigned',
-  in_progress: 'In Progress',
-  needs_review: 'Needs Review',
-  resolved: 'Resolved',
-  closed: 'Closed',
-  rejected: 'Rejected'
-};
+import { statusLabel } from '../complaints/ComplaintCard.jsx';
 
 const WORKFLOW_STATUSES = ['submitted', 'under_review', 'assigned', 'in_progress', 'needs_review', 'resolved'];
 
-function statusLabel(status) {
-  return STATUS_LABELS[status] || String(status || 'Unknown').replaceAll('_', ' ');
-}
-
-function formatDate(value) {
-  return value ? new Date(value).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
-}
-
 export default function AdminOperationsDashboard() {
+  const { t, i18n } = useTranslation();
   const { socket } = useNotifications();
   const [summary, setSummary] = useState(null);
   const [recent, setRecent] = useState({ items: [] });
@@ -92,22 +76,22 @@ export default function AdminOperationsDashboard() {
   }, [summary]);
 
   const metrics = [
-    ['Total Complaints', counts.total, 'ink'],
-    ['Open Complaints', counts.open, 'amber'],
-    ['Under Review', counts.under_review, ''],
-    ['Assigned', counts.assigned, ''],
-    ['In Progress', counts.in_progress, ''],
-    ['Needs Review', counts.needs_review, 'amber'],
-    ['Resolved', counts.resolved, 'green'],
-    ['Rejected', counts.rejected, 'red']
+    [t('dashboard.totalComplaints'), counts.total, 'ink'],
+    [t('dashboard.openComplaints'), counts.open, 'amber'],
+    [statusLabel('under_review'), counts.under_review, ''],
+    [statusLabel('assigned'), counts.assigned, ''],
+    [statusLabel('in_progress'), counts.in_progress, ''],
+    [statusLabel('needs_review'), counts.needs_review, 'amber'],
+    [statusLabel('resolved'), counts.resolved, 'green'],
+    [statusLabel('rejected'), counts.rejected, 'red']
   ];
   const recentComplaints = recent.items.filter((complaint) => !complaint.isDuplicate && !complaint.duplicateOf && !complaint.masterComplaint);
 
   return <div className="dashboard-page admin-operations-dashboard">
-    <PageHeader className="admin-dashboard-heading" kicker="City operations" title="Admin dashboard" subtitle="Complaint status and review work in one place." actions={<button className="outline-button" type="button" onClick={() => void refresh()} disabled={loading}>{loading ? 'Refreshing…' : 'Refresh'}</button>} />
+    <PageHeader className="admin-dashboard-heading" kicker={t('dashboard.adminKicker')} title={t('dashboard.adminTitle')} subtitle={t('dashboard.adminSubtitle')} actions={<button className="outline-button" type="button" onClick={() => void refresh()} disabled={loading}>{loading ? t('dashboard.refreshing') : t('dashboard.refresh')}</button>} />
 
     <section className="admin-dashboard-section" aria-labelledby="primary-metrics-heading">
-      <div className="admin-section-heading"><div><p className="eyebrow">Operations at a glance</p><h2 id="primary-metrics-heading">Primary Metrics</h2></div></div>
+      <div className="admin-section-heading"><div><p className="eyebrow">{t('dashboard.atAGlance')}</p><h2 id="primary-metrics-heading">{t('dashboard.primaryMetrics')}</h2></div></div>
       {summaryError && <p className="admin-inline-error" role="status">{summaryError}</p>}
       <div className="admin-primary-metrics">
         {metrics.map(([label, value, tone]) => <article className={`stat-card admin-metric-card ${tone}`} key={label}>
@@ -118,23 +102,23 @@ export default function AdminOperationsDashboard() {
     </section>
 
     <section className="panel admin-recent-panel" aria-labelledby="recent-complaints-heading">
-      <div className="panel-heading"><div><p className="eyebrow">Latest reports</p><h2 id="recent-complaints-heading">Recent Complaints</h2></div></div>
+      <div className="panel-heading"><div><p className="eyebrow">{t('dashboard.latestReports')}</p><h2 id="recent-complaints-heading">{t('dashboard.recentComplaints')}</h2></div></div>
       {recentError && <p className="admin-inline-error" role="status">{recentError}</p>}
       {recentComplaints.length ? <div className="admin-recent-table-wrap"><table className="admin-recent-table">
-        <thead><tr><th>Title</th><th>Category</th><th>Status</th><th>Priority</th><th>Date</th><th>Actions</th></tr></thead>
+        <thead><tr><th>{t('report.titleLabel')}</th><th>{t('report.category')}</th><th>{t('dashboard.status')}</th><th>{t('report.priority')}</th><th>{t('dashboard.date')}</th><th>{t('dashboard.actions')}</th></tr></thead>
         <tbody>{recentComplaints.map((complaint) => <tr key={complaint._id}>
-          <td data-label="Title"><strong>{complaint.title}</strong></td>
-          <td data-label="Category" className="capitalize-cell">{complaint.category?.replaceAll('_', ' ') || '—'}</td>
-          <td data-label="Status"><span className={`admin-status-pill admin-status-${complaint.status}`}>{statusLabel(complaint.status)}</span></td>
-          <td data-label="Priority" className="capitalize-cell">{complaint.priority || '—'}</td>
-          <td data-label="Date">{formatDate(complaint.createdAt)}</td>
-          <td data-label="Actions"><Link className="admin-review-link" to={`/dashboard/complaints/${complaint._id}`}>Review</Link></td>
+          <td data-label={t('report.titleLabel')}><strong>{complaint.title}</strong></td>
+          <td data-label={t('report.category')} className="capitalize-cell">{complaint.category ? t(`category.${complaint.category}`, { defaultValue: complaint.category.replaceAll('_', ' ') }) : '—'}</td>
+          <td data-label={t('dashboard.status')}><span className={`admin-status-pill admin-status-${complaint.status}`}>{statusLabel(complaint.status)}</span></td>
+          <td data-label={t('report.priority')} className="capitalize-cell">{complaint.priority ? t(`priority.${complaint.priority}`, { defaultValue: complaint.priority }) : '—'}</td>
+          <td data-label={t('dashboard.date')}>{complaint.createdAt ? new Date(complaint.createdAt).toLocaleDateString(i18n.resolvedLanguage === 'hi' ? 'hi-IN' : 'en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</td>
+          <td data-label={t('dashboard.actions')}><Link className="admin-review-link" to={`/dashboard/complaints/${complaint._id}`}>{t('dashboard.review')}</Link></td>
         </tr>)}</tbody>
-      </table></div> : loading ? <SkeletonList rows={3} variant="row" /> : <div className="empty-table">{recentError ? 'Recent complaints could not be shown.' : 'No recent complaints to review.'}</div>}
+      </table></div> : loading ? <SkeletonList rows={3} variant="row" /> : <div className="empty-table">{recentError ? t('dashboard.noRecentError') : t('dashboard.noRecentItems')}</div>}
     </section>
 
     <section className="panel admin-workflow-panel" aria-labelledby="workflow-summary-heading">
-      <div className="panel-heading"><div><p className="eyebrow">Current workload</p><h2 id="workflow-summary-heading">Workflow Summary</h2></div></div>
+      <div className="panel-heading"><div><p className="eyebrow">{t('dashboard.currentWorkload')}</p><h2 id="workflow-summary-heading">{t('dashboard.workflowSummary')}</h2></div></div>
       <div className="admin-workflow-counts">
         {WORKFLOW_STATUSES.map((status) => <article className="admin-workflow-count" key={status}>
           <span>{statusLabel(status)}</span><strong>{loading && !summary ? '—' : (counts.byStatus[status] || 0).toLocaleString()}</strong>
