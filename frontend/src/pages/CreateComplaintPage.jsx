@@ -58,8 +58,8 @@ export default function CreateComplaintPage() {
       setCreatedComplaint(complaint);
       try {
         setClassification(await classifyComplaint(complaint._id));
-      } catch (classificationError) {
-        setError(`Complaint submitted, but AI classification is unavailable. ${getApiErrorMessage(classificationError, '')}`.trim());
+      } catch {
+        setError('Manual review required. Your complaint was submitted successfully and duplicate detection completed.');
       }
     } catch (requestError) {
       const duplicate = requestError.response?.data?.error?.code === 'DUPLICATE_DETECTED'

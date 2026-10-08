@@ -112,6 +112,9 @@ const complaintSchema = new mongoose.Schema(
     beforeImages: { type: [attachmentSchema], default: [] },
     afterImages: { type: [attachmentSchema], default: [] },
     completionVerification: { type: completionVerificationSchema },
+    // Classification is separate from completion evidence verification. This
+    // flag is set when optional AI triage fails so staff can review manually.
+    verificationStatus: { type: String, enum: ['manual_review'] },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
     assignedVolunteer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },

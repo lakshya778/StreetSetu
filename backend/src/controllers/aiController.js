@@ -1,5 +1,6 @@
 import { getComplaint } from '../services/complaintService.js';
-import { classifyComplaint } from '../services/aiClassificationService.js';
+import Complaint from '../models/Complaint.js';
+import { AIClassificationError, classifyComplaint } from '../services/aiClassificationService.js';
 
 export async function classify(req, res, next) {
   try {
@@ -10,11 +11,12 @@ export async function classify(req, res, next) {
       req.user.sub
     );
 
-    // AI prediction complaint me save karo
-    complaint.category = result.category;
-    complaint.priority = result.priority;
-
-    await complaint.save();
+    // getComplaint returns a serialized value for the API, so persist the
+    // optional AI suggestion with a model update rather than calling save() on it.
+    await Complaint.findByIdAndUpdate(complaint._id, {
+      $set: { category: result.category, priority: result.priority },
+      $unset: { verificationStatus: 1 }
+    });
 
     return res.json({
       success: true,
@@ -22,6 +24,18 @@ export async function classify(req, res, next) {
       message: 'Complaint classified successfully'
     });
   } catch (error) {
+    if (error instanceof AIClassificationError && req.params.id) {
+      // Complaint creation already succeeded before this optional request. Mark
+      // it for human triage and preserve the existing error response contract.
+      await Complaint.findByIdAndUpdate(req.params.id, {
+        $set: { verificationStatus: 'manual_review' }
+      }).catch((persistError) => {
+        console.error('[AI] manual review status could not be saved', {
+          complaintId: req.params.id,
+          reason: persistError.message
+        });
+      });
+    }
     return next(error);
   }
 }

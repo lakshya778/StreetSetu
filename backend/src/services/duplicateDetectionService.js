@@ -93,7 +93,9 @@ export function scoreDuplicate(payload, existing) {
 }
 
 export async function findDuplicateCandidates(payload, { limit = 5 } = {}) {
-  console.info('[AI] duplicate request', { mode: 'local similarity', limit });
+  // Duplicate matching is deliberately local to the Node API. It queries MongoDB
+  // and never calls the optional Flask classification/verification service.
+  console.info('[Duplicate] request', { mode: 'local similarity', limit });
   const nearby = await Complaint.find({
     status: { $ne: 'rejected' },
     location: { $geoWithin: { $centerSphere: [[payload.longitude, payload.latitude], DUPLICATE_SEARCH_RADIUS_METERS / 6371000] } }
@@ -125,7 +127,7 @@ export async function findDuplicateCandidates(payload, { limit = 5 } = {}) {
       && candidate.confidence >= DUPLICATE_CANDIDATE_SCORE_THRESHOLD)
     .sort((a, b) => b.confidence - a.confidence || a.distanceMeters - b.distanceMeters)
     .slice(0, limit);
-  console.info('[AI] duplicate response', {
+  console.info('[Duplicate] response', {
     mode: 'local similarity',
     nearbyCount: nearby.length,
     candidateCount: candidates.length,

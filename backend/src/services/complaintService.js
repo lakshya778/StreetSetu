@@ -78,6 +78,8 @@ function uniqueImagesByUrl(images = []) {
 
 export async function createComplaint(payload, req) {
   const creator = userId(req);
+  // Keep duplicate detection inside the API and run it before persistence. This
+  // path has no dependency on AI_SERVICE_URL or the Flask service.
   const candidates = await findDuplicateCandidates(payload, { limit: 1 });
   const bestCandidate = candidates[0];
   if (bestCandidate && bestCandidate.confidence >= DUPLICATE_CONFIDENCE_THRESHOLD * 100 && !payload.allowDuplicate) {
