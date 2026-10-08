@@ -12,6 +12,7 @@ import ComplaintMap from '../components/maps/LazyComplaintMap.jsx';
 import VolunteerRouteMap from '../components/maps/LazyVolunteerRouteMap.jsx';
 import RouteSummaryCard from '../components/dashboard/RouteSummaryCard.jsx';
 import VolunteerProfileForm from '../components/layout/VolunteerProfileForm.jsx';
+import PageHeader from '../components/layout/PageHeader.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useNotifications } from '../context/NotificationContext.jsx';
 import SkeletonList from '../components/layout/SkeletonList.jsx';
@@ -180,7 +181,7 @@ export default function VolunteerDashboardPage() {
   const assignedComplaints = filteredAssignments.map((assignment) => assignment.complaint).filter(Boolean);
 
   return <div className="volunteer-page">
-    <div className="page-heading"><div><p className="eyebrow">Volunteer workspace</p><h1>Good morning, {user?.name?.split(' ')[0] || 'volunteer'}.</h1><p className="page-lede">Your assigned street actions, in one clear view.</p></div><button className="outline-button" onClick={loadAssignments}>Refresh <span>↻</span></button></div>
+    <PageHeader kicker="Volunteer workspace" title={`Good morning, ${user?.name?.split(' ')[0] || 'volunteer'}.`} subtitle="Your assigned street actions, in one clear view." actions={<button className="outline-button" onClick={loadAssignments}>Refresh <span>↻</span></button>} />
     {error && <div className="notice-banner">{error}<button onClick={loadAssignments}>Retry</button></div>}
     <div className="volunteer-metrics">{metricCards.map((card) => <article className={`volunteer-metric ${card.tone}`} key={card.label}><span>{card.label}</span><strong>{isLoading ? '—' : card.value}</strong><small>{card.description}</small></article>)}</div>
     <VolunteerProfileForm user={user} onSaved={refreshRoute} />

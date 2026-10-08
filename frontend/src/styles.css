@@ -3,19 +3,37 @@
 @tailwind utilities;
 
 :root {
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
-  color: #1d2925;
-  background: #f5f7f4;
+  --color-primary: #14532D;
+  --color-primary-dark: #0F3D22;
+  --color-primary-soft: #DCEFE2;
+  --color-brand-lime: #E8F26B;
+  --color-accent: #F59E0B;
+  --color-accent-soft: #FEF3C7;
+  --color-info: #0EA5E9;
+  --color-success: #16A34A;
+  --color-warning: #F59E0B;
+  --color-danger: #DC2626;
+  --color-surface: #F7F5EE;
+  --color-card: #FFFFFF;
+  --color-border: #E5E2D8;
+  --color-text: #1C2A22;
+  --color-text-muted: #5B6B61;
+  --radius-card: 12px;
+  --radius-control: 10px;
+  --shadow-card: 0 8px 24px rgb(28 42 34 / 6%);
+  font-family: Inter, "Avenir Next", "Segoe UI", sans-serif;
+  color: var(--color-text);
+  background: var(--color-surface);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; background: #f5f7f4; }
+body { margin: 0; min-width: 320px; background: var(--color-surface); }
 button, input, select { font: inherit; }
 button { cursor: pointer; }
 
-.app-shell { min-height: 100vh; display: flex; background: #f5f7f4; }
+.app-shell { min-height: 100vh; display: flex; background: var(--color-surface); }
 .sidebar { width: 252px; flex: 0 0 252px; background: #183b34; color: #dce9e1; display: flex; flex-direction: column; padding: 27px 16px 18px; position: relative; z-index: 10; }
 .sidebar-brand, .auth-visual-top { display: flex; align-items: center; gap: 10px; }
 .sidebar-brand { padding: 0 12px 36px; }

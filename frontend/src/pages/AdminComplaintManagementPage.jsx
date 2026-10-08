@@ -7,6 +7,7 @@ import ComplaintMap from '../components/maps/LazyComplaintMap.jsx';
 import { statusLabel } from '../components/complaints/ComplaintCard.jsx';
 import { useNotifications } from '../context/NotificationContext.jsx';
 import useDebouncedValue from '../hooks/useDebouncedValue.js';
+import PageHeader from '../components/layout/PageHeader.jsx';
 import SkeletonList from '../components/layout/SkeletonList.jsx';
 
 export default function AdminComplaintManagementPage() {
@@ -128,7 +129,7 @@ export default function AdminComplaintManagementPage() {
   }
 
   return <div className="admin-complaints-page">
-    <div className="page-heading"><div><p className="eyebrow">Admin operations</p><h1>Complaint management</h1><p className="page-lede">Review every report, assign ownership, and follow the full history.</p></div><span className="admin-report-count">{result.total || 0} total reports</span></div>
+    <PageHeader kicker="Admin operations" title="Complaint management" subtitle="Review every report, assign ownership, and follow the full history." actions={<span className="admin-report-count">{result.total || 0} total reports</span>} />
     <div className="complaint-toolbar"><div className="filter-label">Filter reports</div><select name="status" value={filters.status} onChange={updateFilter}><option value="">All statuses</option><option value="submitted">Submitted</option><option value="under_review">Under review</option><option value="assigned">Assigned</option><option value="in_progress">In progress</option><option value="resolved">Resolved</option><option value="closed">Closed</option><option value="rejected">Rejected</option></select><select name="category" value={filters.category} onChange={updateFilter}><option value="">All categories</option>{complaintCategories.map((category) => <option key={category} value={category}>{category.replaceAll('_', ' ')}</option>)}</select><select name="priority" value={filters.priority} onChange={updateFilter}><option value="">All priorities</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option></select></div>
     <label className="admin-search-field">Search reports<input name="search" value={searchInput} onChange={updateFilter} placeholder="Title, description, or address" /></label>
     {error && <div className="notice-banner">{error}<button onClick={loadComplaints}>Retry</button></div>}

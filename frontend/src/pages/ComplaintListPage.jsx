@@ -6,6 +6,8 @@ import ComplaintCard from '../components/complaints/ComplaintCard.jsx';
 import ComplaintMap from '../components/maps/LazyComplaintMap.jsx';
 import SkeletonList from '../components/layout/SkeletonList.jsx';
 import useDebouncedValue from '../hooks/useDebouncedValue.js';
+import PageHeader from '../components/layout/PageHeader.jsx';
+import StreetEmptyIllustration from '../components/layout/StreetEmptyIllustration.jsx';
 
 const emptyResult = { items: [], total: 0, pages: 1, page: 1 };
 
@@ -56,11 +58,11 @@ export default function ComplaintListPage({ mine = false }) {
   const description = mine ? 'Track the issues you have raised and their progress.' : 'Review, filter, and coordinate neighbourhood reports.';
 
   return <div className="complaints-page">
-    <div className="page-heading"><div><p className="eyebrow">Civic reports</p><h1>{title}</h1><p className="page-lede">{description}</p></div><Link className="primary-button compact-button" to="/dashboard/complaints/new">New complaint <span>+</span></Link></div>
+    <PageHeader kicker="Civic reports" title={title} subtitle={description} actions={<Link className="primary-button compact-button" to="/dashboard/complaints/new">New complaint <span>+</span></Link>} />
     <div className="complaint-toolbar"><div className="filter-label">{result.total || 0} reports</div><input name="search" value={searchInput} onChange={updateFilter} placeholder="Search title, details, address" aria-label="Search reports" /><select name="status" value={filters.status} onChange={updateFilter}><option value="">All statuses</option>{['submitted', 'under_review', 'assigned', 'in_progress', 'resolved', 'closed', 'rejected'].map((status) => <option key={status} value={status}>{status.replaceAll('_', ' ')}</option>)}</select><select name="category" value={filters.category} onChange={updateFilter}><option value="">All categories</option>{complaintCategories.map((category) => <option key={category} value={category}>{category.replaceAll('_', ' ')}</option>)}</select><select name="priority" value={filters.priority} onChange={updateFilter}><option value="">All priorities</option>{['low', 'medium', 'high', 'critical'].map((priority) => <option key={priority} value={priority}>{priority}</option>)}</select></div>
     {error && <div className="notice-banner">{error}</div>}
     {!isLoading && result.items.length > 0 && <ComplaintMap complaints={result.items} className="complaints-overview-map" />}
-    {isLoading ? <SkeletonList rows={6} /> : result.items.length ? <div className="complaint-grid">{result.items.map((complaint) => <ComplaintCard key={complaint._id} complaint={complaint} />)}</div> : <div className="empty-state complaint-empty"><span aria-hidden="true">◈</span><strong>No complaints found</strong><p>Try adjusting your filters or report an issue in your neighbourhood.</p><Link className="primary-button compact-button" to="/dashboard/complaints/new">Report an issue <span>→</span></Link></div>}
+    {isLoading ? <SkeletonList rows={6} /> : result.items.length ? <div className="complaint-grid">{result.items.map((complaint) => <ComplaintCard key={complaint._id} complaint={complaint} />)}</div> : <div className="empty-state complaint-empty"><StreetEmptyIllustration /><strong>No complaints found</strong><p>Try adjusting your filters or report an issue in your neighbourhood.</p><Link className="primary-button compact-button" to="/dashboard/complaints/new">Report an issue <span>→</span></Link></div>}
     {result.pages > 1 && <div className="pagination"><button disabled={filters.page <= 1} onClick={() => setFilters((current) => ({ ...current, page: current.page - 1 }))}>← Previous</button><span>Page {result.page} of {result.pages}</span><button disabled={filters.page >= result.pages} onClick={() => setFilters((current) => ({ ...current, page: current.page + 1 }))}>Next →</button></div>}
   </div>;
 }

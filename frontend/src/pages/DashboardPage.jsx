@@ -3,6 +3,7 @@ import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieCh
 import api, { getApiErrorMessage } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useNotifications } from '../context/NotificationContext.jsx';
+import PageHeader from '../components/layout/PageHeader.jsx';
 const AdminOperationsDashboard = lazy(() => import('../components/dashboard/AdminOperationsDashboard.jsx'));
 
 const emptySummary = {
@@ -46,14 +47,13 @@ function CommunityDashboard({ user }) {
     { label: 'Total complaints', value: summary.totalComplaints, tone: 'ink', mark: '◈' },
     { label: 'Open right now', value: summary.openComplaints, tone: 'amber', mark: '◒' },
     { label: 'Resolved', value: summary.resolvedComplaints, tone: 'green', mark: '✓' },
-    { label: 'Rejected', value: summary.rejectedComplaints, tone: 'red', mark: '×' },
-    { label: 'Rejection rate', value: `${summary.rejectionRate}%`, tone: 'rose', mark: '%' }
+    { label: 'Rejected', value: summary.rejectedComplaints, tone: 'red', mark: '×' }
   ];
 
   return <div className="dashboard-page">
-    <div className="page-heading"><div><p className="eyebrow">Community dashboard</p><h1>Good morning, {user?.name?.split(' ')[0] || 'there'}.</h1><p className="page-lede">Here is the pulse of your neighbourhood today.</p></div></div>
+    <PageHeader kicker="Community dashboard" title={`Good morning, ${user?.name?.split(' ')[0] || 'there'}.`} subtitle="Here is the pulse of your neighbourhood today." />
     {error && <div className="notice-banner">{error}</div>}
-    <div className="stats-grid rejection-stats-grid">{cards.map((card) => <article className={`stat-card ${card.tone}`} key={card.label}><div className="stat-top"><span>{card.label}</span><b>{card.mark}</b></div><strong>{isLoading ? '—' : typeof card.value === 'number' ? card.value.toLocaleString() : card.value}</strong><small>{card.label === 'Rejection rate' ? 'Rejected / all complaints' : 'Across your visible workspace'}</small></article>)}</div>
+    <div className="stats-grid rejection-stats-grid">{cards.map((card) => <article className={`stat-card ${card.tone}`} key={card.label}><div className="stat-top"><span>{card.label}</span><b>{card.mark}</b></div><strong>{isLoading ? '—' : card.value.toLocaleString()}</strong><small>{card.label === 'Rejected' ? `${summary.rejectionRate}% rejection rate` : 'Across your visible workspace'}</small></article>)}</div>
     <div className="dashboard-grid dashboard-analytics-grid">
       <section className="panel chart-panel"><div className="panel-heading"><div><p className="eyebrow">Issue mix</p><h2>Complaints by category</h2></div></div><div className="dashboard-chart">{summary.categoryCounts.length ? <ResponsiveContainer width="100%" height="100%"><BarChart data={summary.categoryCounts}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="category" tickFormatter={(value) => value.replaceAll('_', ' ')} interval={0} angle={-15} textAnchor="end" height={55} /><YAxis allowDecimals={false} /><Tooltip /><Bar dataKey="count" name="Complaints" fill="#83a978" radius={[5, 5, 0, 0]} /></BarChart></ResponsiveContainer> : <div className="chart-empty">No complaint data yet.</div>}</div></section>
       <section className="panel chart-panel"><div className="panel-heading"><div><p className="eyebrow">Lifecycle</p><h2>Complaints by status</h2></div></div><div className="dashboard-chart status-chart">{summary.statusCounts.length ? <ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={summary.statusCounts} dataKey="count" nameKey="status" innerRadius="48%" outerRadius="75%" paddingAngle={2} label={({ name, percent }) => `${name.replaceAll('_', ' ')} ${(percent * 100).toFixed(0)}%`}>{summary.statusCounts.map((item, index) => <Cell key={item.status} fill={STATUS_COLORS[index % STATUS_COLORS.length]} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer> : <div className="chart-empty">No complaint data yet.</div>}</div></section>

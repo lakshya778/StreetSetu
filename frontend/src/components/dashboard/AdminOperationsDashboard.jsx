@@ -5,6 +5,7 @@ import { getComplaints } from '../../api/complaints.js';
 import { useNotifications } from '../../context/NotificationContext.jsx';
 import DuplicateComplaintsPanel from './DuplicateComplaintsPanel.jsx';
 import SkeletonList from '../layout/SkeletonList.jsx';
+import PageHeader from '../layout/PageHeader.jsx';
 
 const STATUS_LABELS = {
   submitted: 'Submitted',
@@ -103,10 +104,7 @@ export default function AdminOperationsDashboard() {
   const recentComplaints = recent.items.filter((complaint) => !complaint.isDuplicate && !complaint.duplicateOf && !complaint.masterComplaint);
 
   return <div className="dashboard-page admin-operations-dashboard">
-    <div className="page-heading admin-dashboard-heading">
-      <div><p className="eyebrow">City operations</p><h1>Admin dashboard</h1><p className="page-lede">Complaint status and review work in one place.</p></div>
-      <button className="outline-button" type="button" onClick={() => void refresh()} disabled={loading}>{loading ? 'Refreshing…' : 'Refresh'}</button>
-    </div>
+    <PageHeader className="admin-dashboard-heading" kicker="City operations" title="Admin dashboard" subtitle="Complaint status and review work in one place." actions={<button className="outline-button" type="button" onClick={() => void refresh()} disabled={loading}>{loading ? 'Refreshing…' : 'Refresh'}</button>} />
 
     <section className="admin-dashboard-section" aria-labelledby="primary-metrics-heading">
       <div className="admin-section-heading"><div><p className="eyebrow">Operations at a glance</p><h2 id="primary-metrics-heading">Primary Metrics</h2></div></div>

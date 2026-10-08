@@ -10,6 +10,7 @@ import ComplaintMap from '../components/maps/LazyComplaintMap.jsx';
 import SkeletonList from '../components/layout/SkeletonList.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useNotifications } from '../context/NotificationContext.jsx';
+import PageHeader from '../components/layout/PageHeader.jsx';
 
 const ADMIN_TRANSITIONS = {
   submitted: ['under_review', 'rejected'],
@@ -189,18 +190,12 @@ export default function ComplaintDetailsPage() {
   return (
     <div className="details-page">
       <Link className="back-link" to="/dashboard/complaints">← Back to complaints</Link>
-      <div className="details-heading">
-        <div>
-          <p className="eyebrow">Complaint detail</p>
-          <h1>{complaint.title || 'Complaint details'}</h1>
-          <p className="page-lede">Reported {formatDate(complaint.createdAt, 'date')}</p>
-        </div>
-        <span className={`detail-status status-${complaint.status}`}><i />{statusLabel(complaint.status)}</span>
-      </div>
+      <PageHeader className="details-heading" kicker="Complaint detail" title={complaint.title || 'Complaint details'} subtitle={`Reported ${formatDate(complaint.createdAt, 'date')}`} actions={<span className={`detail-status status-${complaint.status}`}><i />{statusLabel(complaint.status)}</span>} />
       {error && <div className="notice-banner" role="alert">{error}</div>}
       <div className="details-grid">
         <section className="panel detail-main">
           <div className="detail-tags"><span className={`priority-label priority-${complaint.priority || 'medium'}`}>{complaint.priority || 'Normal'} priority</span><span className="category-tag">{displayCategory(complaint.category)}</span></div>
+          <section className="ai-triage-card"><span className="ai-triage-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3 1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2L12 3Z" /><path d="m19 14 .9 2.1L22 17l-2.1.9L19 20l-.9-2.1L16 17l2.1-.9L19 14Z" /></svg></span><div><strong>AI-assisted triage</strong><p>Routing suggestions support the team; the report remains available for human review.</p></div></section>
           <div className="supporter-summary"><strong>{complaint.supporterCount ?? complaint.voteCount ?? 0}</strong> people support this complaint <button type="button" className="outline-button" onClick={handleSupport} disabled={isSupporting}>{isSupporting ? 'Adding support…' : 'Support this complaint'}</button></div>
           <p className="detail-description">{complaint.description}</p>
           {complaint.status === 'rejected' && <div className="rejection-reason-box"><strong>Rejection reason</strong><p>{complaint.rejectionReason || history.find((event) => event.status === 'rejected')?.note || 'No reason was recorded for this historical rejection.'}</p>{complaint.rejectedAt && <small>Rejected {new Date(complaint.rejectedAt).toLocaleString('en-IN')}</small>}</div>}
@@ -212,7 +207,7 @@ export default function ComplaintDetailsPage() {
               ? `Photo taken at ${formatDate(latestProof.capturedAt, 'datetime')}, ${Number.isFinite(Number(latestProof.distance)) ? `${Math.round(Number(latestProof.distance))} m` : 'distance unavailable'} from reported spot`
               : `DEV gallery photo uploaded at ${formatDate(latestProof.changedAt, 'datetime')}`}</p>
             <span className={`status-badge ${complaint.completionVerification?.verificationStatus === 'verified' ? 'resolved-badge' : ''}`}>
-              {complaint.completionVerification?.verificationStatus === 'verified' ? 'Verified' : 'Needs review'}
+              {latestProof.captureSource === 'live_camera' ? 'Verified live capture' : complaint.completionVerification?.verificationStatus === 'verified' ? 'Verified' : 'Needs review'}
             </span>
           </div>}
         </section>
