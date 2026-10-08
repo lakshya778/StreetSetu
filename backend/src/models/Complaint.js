@@ -56,12 +56,16 @@ const statusHistorySchema = new mongoose.Schema(
   {
     eventType: {
       type: String,
-      enum: ['created', 'assigned', 'reassigned', 'status_changed'],
+      enum: ['created', 'assigned', 'reassigned', 'status_changed', 'sla_escalated'],
       default: 'status_changed'
     },
     status: { type: String, enum: COMPLAINT_STATUSES, required: true },
     previousStatus: { type: String, enum: COMPLAINT_STATUSES },
-    changedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    changedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required() { return this.eventType !== 'sla_escalated'; }
+    },
     assignedVolunteer: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     note: { type: String, trim: true, maxlength: 1000 },
     captureSource: { type: String, enum: ['live_camera', 'dev_gallery'] },
@@ -83,6 +87,10 @@ const complaintSchema = new mongoose.Schema(
     priority: { type: String, enum: COMPLAINT_PRIORITIES, default: 'medium', index: true },
     status: { type: String, enum: COMPLAINT_STATUSES, default: 'submitted', index: true },
     isAnonymous: { type: Boolean, default: false },
+    slaDeadline: { type: Date, index: true },
+    overdueSince: { type: Date },
+    escalationLevel: { type: Number, default: 0, min: 0, max: 3 },
+    isOverdue: { type: Boolean, default: false, index: true },
     location: {
       type: { type: String, enum: ['Point'], required: true },
       coordinates: {
@@ -155,5 +163,6 @@ complaintSchema.index({ category: 1, status: 1, createdAt: -1 });
 complaintSchema.index({ city: 1, area: 1, createdAt: -1 });
 complaintSchema.index({ area: 1, category: 1, status: 1, createdAt: -1 });
 complaintSchema.index({ 'completionVerification.verificationStatus': 1, 'completionVerification.requestedAt': -1 });
+complaintSchema.index({ status: 1, slaDeadline: 1, escalationLevel: 1 });
 
 export default mongoose.model('Complaint', complaintSchema);

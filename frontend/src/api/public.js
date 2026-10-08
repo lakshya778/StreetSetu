@@ -9,3 +9,8 @@ export async function getPublicComplaintTracking(complaintId) {
   const { data } = await api.get(`/public/complaints/${encodeURIComponent(complaintId)}`);
   return data.data;
 }
+
+export async function getPublicOverdueComplaints() {
+  const { data } = await api.get('/complaints/overdue');
+  return data.data;
+}

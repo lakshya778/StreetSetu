@@ -15,6 +15,7 @@ import { requestContext } from './middleware/requestContext.js';
 import { apiRateLimit } from './middleware/rateLimits.js';
 import { initializeRealtime } from './services/realtimeService.js';
 import { checkAiServiceHealth } from './services/aiServiceHealth.js';
+import { startSlaEscalationJob } from './services/escalationService.js';
 
 if (process.env.SENTRY_DSN) {
   Sentry.init({ dsn: process.env.SENTRY_DSN, environment: process.env.NODE_ENV || 'development', tracesSampleRate: Number(process.env.SENTRY_TRACES_SAMPLE_RATE || 0.05) });
@@ -78,6 +79,7 @@ initializeRealtime(httpServer, allowedOrigins.length ? allowedOrigins : ['http:/
 
 await mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/streetsetu');
 console.log('MongoDB connected');
+const slaEscalationTask = startSlaEscalationJob();
 httpServer.listen(PORT, () => {
   console.log(`StreetSetu API running on port ${PORT}`);
   void checkAiServiceHealth();
@@ -85,6 +87,7 @@ httpServer.listen(PORT, () => {
 
 async function shutdown(signal) {
   console.log(`${signal} received; closing StreetSetu services`);
+  slaEscalationTask.stop();
   httpServer.close(async () => {
     await mongoose.disconnect();
     process.exit(0);

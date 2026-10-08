@@ -9,6 +9,19 @@
 .anonymous-report-toggle span { display: grid; gap: 4px; }
 .anonymous-report-toggle strong { color: var(--color-text); font-size: 13px; }
 .anonymous-report-toggle small { color: var(--color-text-muted); font-size: 12px; font-weight: 400; }
+.overdue-page .public-hero { padding-bottom: 22px; }
+.overdue-list { display: grid; gap: 12px; }
+.overdue-card { padding: 20px; }
+.overdue-card-heading, .overdue-card-meta { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.overdue-card-heading h2 { margin: 0; color: var(--color-text); font: 500 22px Georgia, serif; }
+.overdue-card-heading .eyebrow { margin-bottom: 7px; }
+.overdue-level { flex: 0 0 auto; border-radius: 999px; padding: 7px 10px; background: var(--color-accent-soft); color: #784d00; font-size: 11px; font-weight: 700; }
+.overdue-card-meta { align-items: center; margin-top: 16px; border-top: 1px solid var(--color-border); padding-top: 12px; color: var(--color-text-muted); font-size: 12px; }
+.overdue-card-meta strong { color: #b42318; }
+.overdue-empty, .overdue-message { color: var(--color-text-muted); }
+@media (max-width: 560px) {
+  .overdue-card-heading, .overdue-card-meta { align-items: flex-start; flex-direction: column; }
+}
 .public-page { min-height: 100vh; background: #f5f8f3; }
 .public-site-header { display: flex; justify-content: space-between; align-items: center; gap: 18px; min-height: 72px; padding: 12px max(22px,calc((100vw - 1180px)/2)); border-bottom: 1px solid #e4ebe3; background: #fff; }
 .public-brand { display: flex; align-items: center; gap: 10px; color: #29483e; text-decoration: none; }

@@ -12,6 +12,7 @@ import { emitToRole, emitToUser, publishComplaintUpdate } from './realtimeServic
 import { recordAudit } from './auditService.js';
 import { requireVerifiedCompletion } from './completionVerificationService.js';
 import { redactComplaintReporter } from './complaintPrivacy.js';
+import { buildSlaDeadline } from './escalationService.js';
 import {
   notifyComplaintRejected,
   notifyComplaintImagesUploaded,
@@ -97,6 +98,7 @@ export async function createComplaint(payload, req) {
     afterImages: uniqueImagesByUrl(payload.afterImages),
     allowDuplicate: undefined,
     createdBy: creator,
+    slaDeadline: buildSlaDeadline(payload.priority || 'medium'),
     isDuplicate: Boolean(duplicateOf),
     masterComplaint: duplicateOf,
     duplicateOf,

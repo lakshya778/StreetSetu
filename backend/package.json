@@ -14,8 +14,8 @@
     "@sentry/node": "^11.1.0",
     "bcryptjs": "latest",
     "cloudinary": "latest",
-    "cookie-parser": "^1.4.7",
     "compression": "^1.8.1",
+    "cookie-parser": "^1.4.7",
     "cors": "latest",
     "dotenv": "latest",
     "express": "latest",
@@ -25,6 +25,7 @@
     "mongoose": "latest",
     "morgan": "latest",
     "multer": "latest",
+    "node-cron": "^4.6.0",
     "nodemailer": "latest",
     "pdfkit": "^0.20.2",
     "socket.io": "^4.8.4"

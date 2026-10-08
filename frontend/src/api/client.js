@@ -118,7 +118,8 @@ function isPublicApiRequest(config) {
   const url = String(config.url || '');
   return config.skipAccessToken
     || /\/auth\/(login|register|refresh|logout)(?:\?|$)/.test(url)
-    || /\/public\/(transparency|complaints)(?:\/|\?|$)/.test(url);
+    || /\/public\/(transparency|complaints)(?:\/|\?|$)/.test(url)
+    || /\/complaints\/overdue(?:\?|$)/.test(url);
 }
 
 function storeAccessToken(token) {

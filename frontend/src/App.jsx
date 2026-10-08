@@ -15,6 +15,7 @@ const NotificationPage = lazy(() => import('./pages/NotificationPage.jsx'));
 const ComplaintManagementHomePage = lazy(() => import('./pages/ComplaintManagementHomePage.jsx'));
 const TransparencyPage = lazy(() => import('./pages/TransparencyPage.jsx'));
 const PublicComplaintTrackingPage = lazy(() => import('./pages/PublicComplaintTrackingPage.jsx'));
+const OverdueComplaintsPage = lazy(() => import('./pages/OverdueComplaintsPage.jsx'));
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/transparency" element={<TransparencyPage />} />
           <Route path="/track/:complaintId" element={<PublicComplaintTrackingPage />} />
+          <Route path="/overdue" element={<OverdueComplaintsPage />} />
           <Route element={<ProtectedRoute />}>
             <Route element={<DashboardLayout />}>
               <Route path="/dashboard" element={<DashboardHomePage />} />

@@ -15,6 +15,7 @@ import {
   updateComplaintStatus
 } from '../services/complaintService.js';
 import { DUPLICATE_CONFIDENCE_THRESHOLD } from '../services/duplicateDetectionService.js';
+import { listOverdueComplaints } from '../services/escalationService.js';
 
 export async function create(req, res, next) {
   try {
@@ -88,4 +89,10 @@ export async function mergeDuplicate(req, res, next) {
 export async function map(req, res, next) {
   try { return res.json({ success: true, data: await listMapComplaints(req.query, req) }); }
   catch (error) { return next(error); }
+}
+
+export async function overdue(req, res, next) {
+  try {
+    return res.json({ success: true, data: await listOverdueComplaints(), message: 'Overdue complaints loaded' });
+  } catch (error) { return next(error); }
 }

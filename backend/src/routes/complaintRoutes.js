@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth.js';
 import { authorize } from '../middleware/authorize.js';
-import { categories, create, detail, duplicateCheck, duplicates, list, map, mergeDuplicate, submitFeedback, supportDuplicateComplaint, unvote, updateStatus, verify, vote } from '../controllers/complaintController.js';
+import { categories, create, detail, duplicateCheck, duplicates, list, map, mergeDuplicate, overdue, submitFeedback, supportDuplicateComplaint, unvote, updateStatus, verify, vote } from '../controllers/complaintController.js';
 import { discoverNearby } from '../controllers/geoController.js';
 import {
 	validateCreateComplaint,
@@ -13,6 +13,7 @@ import { validateFeedback } from '../validators/feedbackValidator.js';
 
 const router = Router();
 
+router.get('/overdue', overdue);
 router.use(authenticate);
 router.get('/categories', categories);
 router.get('/map', authorize('citizen', 'volunteer', 'admin'), validateListComplaints, map);

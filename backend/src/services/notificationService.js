@@ -118,6 +118,20 @@ export async function notifyComplaintSubmitted({ complaint }) {
   });
 }
 
+export async function notifyComplaintEscalated({ complaint, levelName }) {
+  const reporterId = complaint.createdBy?._id || complaint.createdBy;
+  const assigneeId = complaint.assignedVolunteer?._id || complaint.assignedVolunteer
+    || complaint.assignedTo?._id || complaint.assignedTo;
+  const recipientIds = [...new Set([reporterId, assigneeId].filter(Boolean).map(String))];
+  await notifyRecipients({
+    complaint,
+    recipientIds,
+    title: `Complaint escalated to ${levelName}`,
+    message: `The service deadline for "${complaint.title}" passed. It has been escalated to ${levelName}.`,
+    metadata: { eventType: 'sla_escalated', escalationLevel: complaint.escalationLevel, levelName }
+  });
+}
+
 export async function notifyVolunteerAssigned({ complaint, volunteerId, reassigned = false }) {
   await notifyRecipients({
     complaint,
