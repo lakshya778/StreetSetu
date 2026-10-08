@@ -156,6 +156,19 @@ export async function notifyVolunteerAssigned({ complaint, volunteerId, reassign
   }
 }
 
+export async function notifyCompletionEvidenceRejected({ complaint }) {
+  const volunteerId = complaint.assignedVolunteer?._id || complaint.assignedVolunteer
+    || complaint.assignedTo?._id || complaint.assignedTo;
+  if (!volunteerId) return;
+  await notifyRecipients({
+    complaint,
+    recipientIds: [String(volunteerId)],
+    title: 'Completion evidence rejected',
+    message: `The completion evidence for "${complaint.title}" was rejected. Upload new completion proof to continue.`,
+    metadata: { eventType: 'completion_evidence_rejected', status: 'in_progress' }
+  });
+}
+
 export async function notifyComplaintResolved({ complaint, previousStatus, note }) {
   const recipientIds = [String(complaint.createdBy?._id || complaint.createdBy)];
   const assignedVolunteerId = complaint.assignedVolunteer?._id || complaint.assignedVolunteer;

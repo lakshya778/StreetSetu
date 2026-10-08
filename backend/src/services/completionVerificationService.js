@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import Complaint from '../models/Complaint.js';
 import { emitToRole, publishComplaintUpdate } from './realtimeService.js';
 import { recordAudit } from './auditService.js';
+import { notifyCompletionEvidenceRejected } from './notificationService.js';
 
 const activeVerifications = new Set();
 
@@ -243,7 +244,7 @@ export async function reviewCompletionVerification(complaintId, decision, req) {
   if (!complaint) {
     const error = new Error('Complaint not found'); error.statusCode = 404; error.code = 'NOT_FOUND'; throw error;
   }
-  const requestedStatus = decision === 'approve' ? 'resolved' : complaint.status;
+  const requestedStatus = decision === 'approve' ? 'resolved' : 'in_progress';
   console.info('Completion review status transition requested', {
     complaintId: String(complaint._id),
     currentStatus: complaint.status,
@@ -254,7 +255,8 @@ export async function reviewCompletionVerification(complaintId, decision, req) {
       reviewDecision: complaint.completionVerification?.reviewDecision || null
     }
   });
-  if (!complaint.completionVerification || complaint.completionVerification.verificationStatus === 'pending') {
+  if (complaint.status !== 'needs_review'
+    || complaint.completionVerification?.verificationStatus !== 'needs_review') {
     const error = new Error('Completion verification is not ready for review');
     error.statusCode = 409;
     error.code = 'VERIFICATION_PENDING';
@@ -268,13 +270,13 @@ export async function reviewCompletionVerification(complaintId, decision, req) {
     error.code = 'DEV_GALLERY_CANNOT_BE_VERIFIED';
     throw error;
   }
-  complaint.completionVerification.verificationStatus = decision === 'approve' ? 'verified' : 'needs_review';
+  complaint.completionVerification.verificationStatus = decision === 'approve' ? 'verified' : 'rejected';
   complaint.completionVerification.reviewDecision = decision === 'approve' ? 'approved' : 'rejected';
   complaint.completionVerification.reviewedBy = req.user.sub;
   complaint.completionVerification.reviewedAt = new Date();
-  if (decision === 'reject') complaint.completionVerification.failureReason = 'Admin review rejected the submitted completion evidence.';
+  if (decision === 'reject') complaint.completionVerification.failureReason = 'Admin rejected completion evidence';
   const previousStatus = complaint.status;
-  if (decision === 'approve' && complaint.status === 'needs_review') {
+  if (decision === 'approve') {
     complaint.status = 'resolved';
     complaint.resolvedAt = new Date();
     complaint.statusHistory.push({
@@ -282,10 +284,35 @@ export async function reviewCompletionVerification(complaintId, decision, req) {
       assignedVolunteer: complaint.assignedVolunteer || complaint.assignedTo,
       note: 'Completion evidence approved by admin', changedAt: new Date()
     });
+  } else {
+    const reviewedAt = complaint.completionVerification.reviewedAt;
+    complaint.completionEvidenceHistory.push({
+      images: complaint.afterImages.map((image) => typeof image.toObject === 'function' ? image.toObject() : image),
+      verificationStatus: 'rejected',
+      failureReason: complaint.completionVerification.failureReason,
+      evidenceFingerprint: complaint.completionVerification.evidenceFingerprint,
+      reviewedBy: req.user.sub,
+      reviewedAt
+    });
+    complaint.afterImages = [];
+    complaint.status = 'in_progress';
+    complaint.resolvedAt = undefined;
+    complaint.statusHistory.push({
+      eventType: 'status_changed', previousStatus, status: 'in_progress', changedBy: req.user.sub,
+      assignedVolunteer: complaint.assignedVolunteer || complaint.assignedTo,
+      note: 'Admin rejected completion evidence', changedAt: new Date()
+    });
   }
   await complaint.save();
   await recordAudit({ req, action: decision === 'approve' ? 'complaint.completion_verification_approved' : 'complaint.completion_verification_rejected', entityType: 'complaint', entityId: complaint._id, previousValue: previousStatus, newValue: complaint.status, metadata: { fraudScore: complaint.completionVerification.fraudScore } });
+  if (decision === 'reject') {
+    try {
+      await notifyCompletionEvidenceRejected({ complaint });
+    } catch (error) {
+      console.error('Completion evidence rejection notification failed:', error.message);
+    }
+  }
   publishComplaintUpdate(complaint, 'complaint:status');
   emitToRole('admin', 'dashboard:updated', { complaintId: String(complaint._id), eventType: 'completion_verification_reviewed' });
-  return complaint.completionVerification;
+  return complaint;
 }

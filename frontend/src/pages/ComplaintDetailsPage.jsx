@@ -166,8 +166,9 @@ export default function ComplaintDetailsPage() {
     setIsReviewingCompletion(true);
     setError('');
     try {
-      await reviewCompletionVerification(id, decision);
-      await loadComplaint();
+      const updated = await reviewCompletionVerification(id, decision);
+      setComplaint(updated);
+      setStatus(updated.status || 'submitted');
     } catch (requestError) {
       setError(getApiErrorMessage(requestError, 'Completion evidence review could not be saved.'));
     } finally {
@@ -186,7 +187,8 @@ export default function ComplaintDetailsPage() {
     && (complaint.assignedVolunteer || complaint.assignedTo);
   const canReviewCompletion = user?.role === 'admin'
     && complaint.status === 'needs_review'
-    && complaint.completionVerification?.verificationStatus === 'needs_review';
+    && ['pending', 'needs_review'].includes(complaint.completionVerification?.verificationStatus)
+    && latestProof?.status === 'needs_review';
   const statusOptions = [complaint.status, ...availableTransitions.filter((nextStatus) => nextStatus !== complaint.status)];
 
   return (
@@ -209,7 +211,11 @@ export default function ComplaintDetailsPage() {
               ? `Photo taken at ${formatDate(latestProof.capturedAt, 'datetime')}, ${Number.isFinite(Number(latestProof.distance)) ? `${Math.round(Number(latestProof.distance))} m` : 'distance unavailable'} from reported spot`
               : `DEV gallery photo uploaded at ${formatDate(latestProof.changedAt, 'datetime')}`}</p>
             <span className={`status-badge ${complaint.completionVerification?.verificationStatus === 'verified' ? 'resolved-badge' : ''}`}>
-              {latestProof.captureSource === 'live_camera' ? 'Verified live capture' : complaint.completionVerification?.verificationStatus === 'verified' ? 'Verified' : 'Needs review'}
+              {complaint.completionVerification?.verificationStatus === 'rejected'
+                ? 'Rejected'
+                : complaint.completionVerification?.verificationStatus === 'verified'
+                  ? latestProof.captureSource === 'live_camera' ? 'Verified live capture' : 'Verified'
+                  : 'Needs review'}
             </span>
           </div>}
         </section>
@@ -236,7 +242,8 @@ export default function ComplaintDetailsPage() {
         })}</div> : <div className="empty-state compact-empty"><strong>No similar nearby reports found</strong><p>This report will remain visible with its own location marker.</p></div>}
       </section>
       {(complaint.beforeImages?.length > 0 || complaint.afterImages?.length > 0) && <section className="panel evidence-comparison"><div className="panel-heading"><div><p className="eyebrow">Field evidence</p><h2>Before and after</h2></div></div><div className="evidence-comparison-grid"><div><h3>Work started</h3><ImageGallery images={complaint.beforeImages} label="Before resolution images" /></div><div><h3>Work completed</h3><ImageGallery images={complaint.afterImages} label="After resolution images" /></div></div></section>}
-      {canReviewCompletion && <section className="panel completion-manual-review"><div><p className="eyebrow">Admin review</p><h2>Completion evidence needs review</h2><p className="page-lede">Automated visual comparison is disabled. Review the work-start and completion photos before deciding.</p></div><div className="completion-manual-review-actions"><button type="button" className="primary-button compact-button" disabled={isReviewingCompletion} onClick={() => void handleCompletionReview('approve')}>{isReviewingCompletion ? 'Saving…' : 'Approve and resolve'}</button><button type="button" className="outline-button" disabled={isReviewingCompletion} onClick={() => void handleCompletionReview('reject')}>Reject evidence</button></div></section>}
+        {complaint.completionEvidenceHistory?.length > 0 && <section className="panel evidence-comparison"><div className="panel-heading"><div><p className="eyebrow">Evidence history</p><h2>Previously rejected completion proof</h2></div></div>{complaint.completionEvidenceHistory.map((entry, index) => <div className="historical-completion-proof" key={`${entry.evidenceFingerprint || 'rejected'}-${entry.reviewedAt || index}`}><p>{entry.failureReason || 'Admin rejected completion evidence'} · {entry.reviewedAt ? new Date(entry.reviewedAt).toLocaleString('en-IN') : 'Review time unavailable'}</p><ImageGallery images={entry.images} label={`Rejected completion evidence ${index + 1}`} /></div>)}</section>}
+        {canReviewCompletion && <section className="panel completion-manual-review"><div><p className="eyebrow">Admin review</p><h2>Completion evidence needs review</h2><p className="page-lede">Automated visual comparison is disabled. Review the work-start and completion photos before deciding.</p></div><div className="completion-manual-review-actions"><button type="button" className="primary-button compact-button" disabled={isReviewingCompletion || complaint.completionVerification?.verificationStatus === 'pending'} onClick={() => void handleCompletionReview('approve')}>{isReviewingCompletion ? 'Saving…' : 'Approve and resolve'}</button><button type="button" className="outline-button" disabled={isReviewingCompletion || complaint.completionVerification?.verificationStatus === 'pending'} onClick={() => void handleCompletionReview('reject')}>Reject evidence</button></div></section>}
       {canLeaveFeedback && <section className="panel citizen-feedback-panel"><div className="panel-heading"><div><p className="eyebrow">How did it go?</p><h2>Rate your volunteer</h2></div></div>{complaint.myFeedback ? <div className="feedback-confirmation"><div className="feedback-stars" aria-label={`${validRating(complaint.myFeedback.rating)} out of 5 stars`}>{'★'.repeat(validRating(complaint.myFeedback.rating))}<span>{'★'.repeat(5 - validRating(complaint.myFeedback.rating))}</span></div><p>Your feedback has been recorded. Thank you for helping improve community service.</p>{complaint.myFeedback.comment && <blockquote>{complaint.myFeedback.comment}</blockquote>}</div> : <form onSubmit={handleFeedbackSubmit}><div className="feedback-star-picker" role="group" aria-label="Rate your volunteer from one to five stars">{[1, 2, 3, 4, 5].map((rating) => <button key={rating} type="button" className={rating <= feedbackRating ? 'is-selected' : ''} aria-label={`${rating} star${rating === 1 ? '' : 's'}`} aria-pressed={feedbackRating === rating} onClick={() => setFeedbackRating(rating)}>★</button>)}</div><label>Optional feedback<textarea value={feedbackComment} onChange={(event) => setFeedbackComment(event.target.value)} maxLength={1000} rows={3} placeholder="Share a few words about your experience" /></label><div className="feedback-form-footer"><small>{feedbackComment.length}/1000</small><button className="primary-button compact-button" disabled={isSubmittingFeedback || feedbackRating === 0}>{isSubmittingFeedback ? 'Submitting...' : 'Submit feedback'}</button></div></form>}</section>}
       {canUpdate && availableTransitions.length > 0 && <form className="panel status-form" onSubmit={handleStatusUpdate}>
         <div><p className="eyebrow">Operations</p><h2>Update status</h2></div>

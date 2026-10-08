@@ -42,7 +42,7 @@ const completionVerificationSchema = new mongoose.Schema({
   gpsDistanceMeters: { type: Number, min: 0 },
   timestampValid: { type: Boolean },
   fraudScore: { type: Number, min: 0, max: 100 },
-  verificationStatus: { type: String, enum: ['pending', 'verified', 'needs_review', 'failed'] },
+  verificationStatus: { type: String, enum: ['pending', 'verified', 'needs_review', 'rejected', 'failed'] },
   evidenceFingerprint: { type: String, trim: true, maxlength: 128 },
   failureReason: { type: String, trim: true, maxlength: 500 },
   requestedAt: { type: Date },
@@ -51,6 +51,15 @@ const completionVerificationSchema = new mongoose.Schema({
   reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   reviewedAt: { type: Date }
 }, { _id: false });
+
+const completionEvidenceHistorySchema = new mongoose.Schema({
+  images: { type: [attachmentSchema], default: [] },
+  verificationStatus: { type: String, enum: ['rejected'], required: true },
+  failureReason: { type: String, trim: true, maxlength: 500 },
+  evidenceFingerprint: { type: String, trim: true, maxlength: 128 },
+  reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  reviewedAt: { type: Date, required: true }
+}, { timestamps: true });
 
 const statusHistorySchema = new mongoose.Schema(
   {
@@ -128,6 +137,7 @@ const complaintSchema = new mongoose.Schema(
     beforeImages: { type: [attachmentSchema], default: [] },
     afterImages: { type: [attachmentSchema], default: [] },
     completionVerification: { type: completionVerificationSchema },
+    completionEvidenceHistory: { type: [completionEvidenceHistorySchema], default: [] },
     // Classification is separate from completion evidence verification. This
     // flag is set when optional AI triage fails so staff can review manually.
     verificationStatus: { type: String, enum: ['manual_review'] },
