@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { reverseGeocode, searchAddresses } from '../../api/locations.js';
-import MapPicker from './MapPicker.jsx';
+import MapPicker from './LazyMapPicker.jsx';
 
 export default function LocationPicker({ latitude, longitude, address, onChange, disabled = false }) {
   const [query, setQuery] = useState('');

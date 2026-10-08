@@ -6,7 +6,8 @@ import { reviewCompletionVerification } from '../api/assignments.js';
 import { statusLabel } from '../components/complaints/ComplaintCard.jsx';
 import ImageGallery from '../components/media/ImageGallery.jsx';
 import CompletionVerificationStatus from '../components/dashboard/CompletionVerificationStatus.jsx';
-import ComplaintMap from '../components/maps/ComplaintMap.jsx';
+import ComplaintMap from '../components/maps/LazyComplaintMap.jsx';
+import SkeletonList from '../components/layout/SkeletonList.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useNotifications } from '../context/NotificationContext.jsx';
 
@@ -171,7 +172,7 @@ export default function ComplaintDetailsPage() {
     }
   }
 
-  if (isLoading) return <div className="loading-state">Loading complaint...</div>;
+  if (isLoading) return <SkeletonList rows={3} variant="row" />;
   if (!complaint) return <section className="complaint-load-error" role="alert"><h1>Unable to load complaint details.</h1><p>{loadError || 'The complaint may be unavailable or you may not have access to it.'}</p><div><button type="button" className="primary-button compact-button" onClick={() => void loadComplaint()}>Retry</button><button type="button" className="outline-button" onClick={() => navigate('/dashboard/complaints', { replace: true })}>Back to complaints</button></div></section>;
 
   const history = Array.isArray(complaint.statusHistory) ? complaint.statusHistory.filter(Boolean) : [];

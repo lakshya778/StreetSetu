@@ -6,6 +6,7 @@ import cors from 'cors';
 import morgan from 'morgan';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import compression from 'compression';
 import mongoose from 'mongoose';
 import * as Sentry from '@sentry/node';
 import apiRoutes from './routes/index.js';
@@ -51,6 +52,7 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,
   referrerPolicy: { policy: 'no-referrer' }
 }));
+app.use(compression());
 app.use(cors({
   origin(origin, callback) {
     if (!origin || !allowedOrigins.length || allowedOrigins.includes(origin)) return callback(null, true);

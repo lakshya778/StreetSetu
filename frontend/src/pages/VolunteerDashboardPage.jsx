@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { getApiErrorMessage } from '../api/client.js';
@@ -7,15 +7,16 @@ import { getCompletionVerification, getMyAssignments, getMyOptimizedRoute, respo
 import { uploadWorkEvidence } from '../api/complaints.js';
 import ImageGallery from '../components/media/ImageGallery.jsx';
 import ImageUploader from '../components/media/ImageUploader.jsx';
-import LiveCameraCapture from '../components/media/LiveCameraCapture.jsx';
 import DevGalleryProof from '../components/media/DevGalleryProof.jsx';
-import ComplaintMap from '../components/maps/ComplaintMap.jsx';
-import VolunteerRouteMap from '../components/maps/VolunteerRouteMap.jsx';
+import ComplaintMap from '../components/maps/LazyComplaintMap.jsx';
+import VolunteerRouteMap from '../components/maps/LazyVolunteerRouteMap.jsx';
 import RouteSummaryCard from '../components/dashboard/RouteSummaryCard.jsx';
 import VolunteerProfileForm from '../components/layout/VolunteerProfileForm.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useNotifications } from '../context/NotificationContext.jsx';
+import SkeletonList from '../components/layout/SkeletonList.jsx';
 
+const LiveCameraCapture = lazy(() => import('../components/media/LiveCameraCapture.jsx'));
 const RESOLVED_STATUSES = ['resolved'];
 const STATUS_LABELS = { assigned: 'Assigned', in_progress: 'In Progress', needs_review: 'Needs Review', resolved: 'Resolved', rejected: 'Rejected' };
 const WORKFLOW_GROUPS = [
@@ -37,6 +38,7 @@ export default function VolunteerDashboardPage() {
   const [assignmentSearch, setAssignmentSearch] = useState('');
   const [analytics, setAnalytics] = useState({ monthlyTrends: [], resolutionTrends: [], statusCounts: [] });
   const [evidenceFiles, setEvidenceFiles] = useState({});
+  const [uploadProgress, setUploadProgress] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState('');
   const [error, setError] = useState('');
@@ -46,7 +48,7 @@ export default function VolunteerDashboardPage() {
     setIsLoading(true);
     try {
       const [assignmentResult, dashboardResult, routeResult] = await Promise.all([
-        getMyAssignments({ page, limit: 100 }),
+        getMyAssignments({ page, limit: 12 }),
         api.get('/dashboard/summary'),
         getMyOptimizedRoute()
       ]);
@@ -86,14 +88,10 @@ export default function VolunteerDashboardPage() {
     setError('');
     try {
       if (files.length) {
-        const evidenceResult = await uploadWorkEvidence(complaintId, stage, files, captureMetadata);
+        setUploadProgress((current) => ({ ...current, [complaintId]: 0 }));
+        const evidenceResult = await uploadWorkEvidence(complaintId, stage, files, captureMetadata, (progress) => setUploadProgress((current) => ({ ...current, [complaintId]: progress })));
         const returnedBeforeImages = evidenceResult.workStartPhotos || evidenceResult.beforeImages || [];
         const returnedAfterImages = evidenceResult.completionPhotos || evidenceResult.afterImages || [];
-        console.info('[Evidence] refreshed from upload response', {
-          complaintId,
-          workStartPhotosCount: returnedBeforeImages.length,
-          completionPhotosCount: returnedAfterImages.length
-        });
         setAssignments((items) => items.map((assignment) => assignment.complaint?._id === complaintId
           ? { ...assignment, complaint: {
             ...assignment.complaint,
@@ -128,7 +126,14 @@ export default function VolunteerDashboardPage() {
       await loadAssignments();
     } catch (requestError) {
       setError(getApiErrorMessage(requestError, 'Complaint status could not be updated.'));
-    } finally { setUpdatingId(''); }
+    } finally {
+      setUpdatingId('');
+      setUploadProgress((current) => {
+        const next = { ...current };
+        delete next[complaintId];
+        return next;
+      });
+    }
   }
 
   async function handleAssignmentResponse(complaintId, response) {
@@ -190,8 +195,8 @@ export default function VolunteerDashboardPage() {
       const items = filteredAssignments.filter(({ complaint }) => complaint?.status === group.key);
       return <section className="assignment-section" key={group.key}>
         <div className="assignment-section-heading"><div><p className="eyebrow">Workflow</p><h2>{group.label}</h2></div><span className={`assignment-count ${group.tone}`}>{items.length}</span></div>
-        {isLoading ? <div className="loading-state compact-loading">Loading...</div> : items.length
-          ? <div className="assignment-list">{items.map((assignment) => <AssignmentCard key={assignment._id} assignment={assignment} evidenceFiles={evidenceFiles[assignment.complaint?._id] || []} onEvidenceChange={(files) => setEvidenceFiles((current) => ({ ...current, [assignment.complaint._id]: files }))} updatingId={updatingId} onStatusChange={handleStatusChange} onAssignmentResponse={handleAssignmentResponse} />)}</div>
+        {isLoading ? <SkeletonList rows={2} /> : items.length
+          ? <div className="assignment-list">{items.map((assignment) => <AssignmentCard key={assignment._id} assignment={assignment} evidenceFiles={evidenceFiles[assignment.complaint?._id] || []} uploadProgress={uploadProgress[assignment.complaint?._id]} onEvidenceChange={(files) => setEvidenceFiles((current) => ({ ...current, [assignment.complaint._id]: files }))} updatingId={updatingId} onStatusChange={handleStatusChange} onAssignmentResponse={handleAssignmentResponse} />)}</div>
           : <div className="assignment-empty">No {group.label.toLowerCase()} complaints.</div>}
       </section>;
     })}</div>
@@ -199,7 +204,7 @@ export default function VolunteerDashboardPage() {
   </div>;
 }
 
-function AssignmentCard({ assignment, evidenceFiles, onEvidenceChange, updatingId, onStatusChange, onAssignmentResponse }) {
+function AssignmentCard({ assignment, evidenceFiles, uploadProgress, onEvidenceChange, updatingId, onStatusChange, onAssignmentResponse }) {
   const complaint = assignment.complaint;
   const isResolved = RESOLVED_STATUSES.includes(complaint.status);
   const needsReview = complaint.status === 'needs_review';
@@ -207,10 +212,7 @@ function AssignmentCard({ assignment, evidenceFiles, onEvidenceChange, updatingI
   const nextStatus = !isResolved && !needsReview && !needsResponse && complaint.status === 'assigned' ? 'in_progress' : !isResolved && !needsReview && complaint.status === 'in_progress' ? 'needs_review' : null;
   const evidenceStage = complaint.status === 'assigned' ? 'before' : 'after';
   const savedEvidence = evidenceStage === 'before' ? complaint.beforeImages || [] : complaint.afterImages || [];
-  const workStartPhotosCount = complaint.beforeImages?.length || 0;
   const completionPhotosCount = complaint.afterImages?.length || 0;
-  const workflowBucket = ['assigned', 'in_progress', 'needs_review', 'resolved', 'rejected'].includes(complaint.status) ? complaint.status : 'unknown';
-  console.log({ assignmentId: assignment._id, status: complaint.status, workflowBucket, workStartPhotosCount, completionPhotosCount });
   return <article className={`assignment-card ${complaint.status === 'rejected' ? 'assignment-card-rejected' : ''}`}>
     <div className="assignment-card-body"><div className={`status-dot status-${complaint.status}`} /><div>
       <div className="assignment-card-meta"><span>{complaint.category?.replaceAll('_', ' ')}</span><time>{new Date(assignment.assignedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</time></div>
@@ -227,7 +229,7 @@ function AssignmentCard({ assignment, evidenceFiles, onEvidenceChange, updatingI
       {isResolved && <span className="status-badge resolved-badge">Resolved</span>}
       {!nextStatus && !isResolved && <Link className="assignment-action" to={`/dashboard/complaints/${complaint._id}`}>View details <span>→</span></Link>}
     </div>
-    {nextStatus && !(evidenceStage === 'after' && completionPhotosCount > 0) && <div className="assignment-evidence-step"><strong>{evidenceStage === 'before' ? 'Before starting' : 'Before submitting for review'}</strong><ImageGallery images={savedEvidence} label={evidenceStage === 'before' ? 'Work-start evidence' : 'Completion evidence'} compact />{evidenceStage === 'before' ? <><ImageUploader files={evidenceFiles} onChange={onEvidenceChange} disabled={updatingId === complaint._id} label="Add work-start image" /><button className="assignment-action evidence-submit-button" disabled={updatingId === complaint._id || !evidenceFiles.length} onClick={() => onStatusChange(complaint._id, nextStatus, evidenceStage, evidenceFiles)}>{updatingId === complaint._id ? 'Saving...' : `Upload & mark ${statusLabel(nextStatus)}`}</button></> : <><LiveCameraCapture disabled={updatingId === complaint._id} onSubmit={(file, metadata) => onStatusChange(complaint._id, nextStatus, evidenceStage, [file], metadata)} /><DevGalleryProof disabled={updatingId === complaint._id} onSubmit={(file, metadata) => onStatusChange(complaint._id, nextStatus, evidenceStage, [file], metadata)} /></>}</div>}
+    {nextStatus && !(evidenceStage === 'after' && completionPhotosCount > 0) && <div className="assignment-evidence-step"><strong>{evidenceStage === 'before' ? 'Before starting' : 'Before submitting for review'}</strong><ImageGallery images={savedEvidence} label={evidenceStage === 'before' ? 'Work-start evidence' : 'Completion evidence'} compact />{evidenceStage === 'before' ? <><ImageUploader files={evidenceFiles} onChange={onEvidenceChange} disabled={updatingId === complaint._id} label="Add work-start image" /><button className="assignment-action evidence-submit-button" disabled={updatingId === complaint._id || !evidenceFiles.length} onClick={() => onStatusChange(complaint._id, nextStatus, evidenceStage, evidenceFiles)}>{updatingId === complaint._id ? 'Saving...' : `Upload & mark ${statusLabel(nextStatus)}`}</button></> : <><Suspense fallback={<div className="skeleton-item" role="status">Preparing camera…</div>}><LiveCameraCapture disabled={updatingId === complaint._id} onSubmit={(file, metadata) => onStatusChange(complaint._id, nextStatus, evidenceStage, [file], metadata)} /></Suspense><DevGalleryProof disabled={updatingId === complaint._id} onSubmit={(file, metadata) => onStatusChange(complaint._id, nextStatus, evidenceStage, [file], metadata)} /></>}{uploadProgress !== undefined && <div className="upload-progress" role="status"><progress max="100" value={uploadProgress} /><span>Uploading proof · {uploadProgress}%</span></div>}</div>}
     {needsReview && <div className="assignment-response-actions"><p>Completion photos are waiting for admin review.</p></div>}
     {needsResponse && <div className="assignment-response-actions"><p>This assignment is awaiting your response.</p><button className="primary-button compact-button" disabled={updatingId === complaint._id} onClick={() => onAssignmentResponse(complaint._id, 'accepted')}>Accept assignment</button><button className="outline-button" disabled={updatingId === complaint._id} onClick={() => onAssignmentResponse(complaint._id, 'declined')}>Decline</button></div>}
   </article>;

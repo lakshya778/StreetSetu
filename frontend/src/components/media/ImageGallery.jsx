@@ -49,7 +49,7 @@ export default function ImageGallery({ images = [], label = 'Images', compact = 
         const alt = image.fileName || image.alt || `${label} ${index + 1}`;
         return <figure className="image-gallery-item" key={src}>
           <button type="button" className="image-gallery-trigger" onClick={() => showImage(index)} aria-label={`View ${alt}`}>
-            <img src={src} alt={alt} loading="lazy" />
+            <img src={src} alt={alt} loading="lazy" decoding="async" width="400" height="300" />
           </button>
           {image.fileName && !compact && <figcaption>{image.fileName}</figcaption>}
           {onRemove && <button type="button" className="image-gallery-remove" onClick={() => onRemove(sourceIndex)} aria-label={`Remove ${alt}`}>×</button>}
@@ -68,7 +68,7 @@ export default function ImageGallery({ images = [], label = 'Images', compact = 
         </header>
         <div className="image-viewer-stage">
           {availableImages.length > 1 && <button type="button" className="image-viewer-nav image-viewer-prev" onClick={() => showImage(activeIndex - 1)} aria-label="Previous image">‹</button>}
-          <img src={activeSrc} alt={activeAlt} style={{ transform: `scale(${zoom})` }} />
+          <img src={activeSrc} alt={activeAlt} loading="lazy" decoding="async" width="1600" height="1200" style={{ transform: `scale(${zoom})` }} />
           {availableImages.length > 1 && <button type="button" className="image-viewer-nav image-viewer-next" onClick={() => showImage(activeIndex + 1)} aria-label="Next image">›</button>}
         </div>
         <footer className="image-viewer-caption">Zoom {Math.round(zoom * 100)}% · Use arrow keys to browse, Esc to close</footer>

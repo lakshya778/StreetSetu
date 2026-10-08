@@ -15,6 +15,7 @@ export default function CreateComplaintPage() {
   const [files, setFiles] = useState([]);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(null);
   const [classification, setClassification] = useState(null);
   const [createdComplaint, setCreatedComplaint] = useState(null);
   const [duplicateCandidate, setDuplicateCandidate] = useState(null);
@@ -53,7 +54,7 @@ export default function CreateComplaintPage() {
     setIsSubmitting(true);
     setError('');
     try {
-      const attachments = files.length ? await uploadComplaintImages(files) : [];
+      const attachments = files.length ? await uploadComplaintImages(files, setUploadProgress) : [];
       const complaint = await createComplaint({ ...form, latitude, longitude, attachments, allowDuplicate });
       setCreatedComplaint(complaint);
       try {
@@ -67,7 +68,7 @@ export default function CreateComplaintPage() {
         : null;
       if (duplicate) { setDuplicateCandidate(duplicate); return; }
       setError(getApiErrorMessage(requestError, 'The complaint could not be submitted.'));
-    } finally { setIsSubmitting(false); }
+    } finally { setIsSubmitting(false); setUploadProgress(null); }
   }
 
   async function supportExisting() {
@@ -96,6 +97,7 @@ export default function CreateComplaintPage() {
       <div className="form-section"><div className="form-section-heading"><p className="form-section-title">Location</p><span>{form.latitude && form.longitude && form.address ? 'Location selected' : 'Required'}</span></div><LocationPicker latitude={form.latitude} longitude={form.longitude} address={form.address} onChange={updateLocation} disabled={isSubmitting || Boolean(createdComplaint)} /><NearbyComplaintsPanel latitude={form.latitude} longitude={form.longitude} /></div>
       <div className="form-section"><p className="form-section-title">Evidence</p><ImageUploader files={files} onChange={setFiles} disabled={isSubmitting || Boolean(createdComplaint)} label="Add complaint photos" /></div>
       {error && <div className="form-error" role="alert">{error}</div>}
+      {uploadProgress !== null && <div className="upload-progress" role="status"><progress max="100" value={uploadProgress} /><span>Uploading photos · {uploadProgress}%</span></div>}
       <div className="form-actions"><Link className="outline-button" to="/dashboard/complaints">Cancel</Link><button className="primary-button compact-button" type="submit" disabled={isSubmitting || createdComplaint}>{isSubmitting ? 'Submitting...' : createdComplaint ? 'Complaint submitted' : 'Submit complaint'} <span>→</span></button></div>
     </form>
     <aside className="report-guidance panel">

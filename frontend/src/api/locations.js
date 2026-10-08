@@ -1,12 +1,21 @@
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org';
 
 async function requestNominatim(path, signal) {
-  const response = await fetch(`${NOMINATIM_URL}${path}`, {
-    headers: { Accept: 'application/json' },
-    signal
-  });
-  if (!response.ok) throw new Error('Location search is temporarily unavailable.');
-  return response.json();
+  const timeoutController = new AbortController();
+  const timeout = window.setTimeout(() => timeoutController.abort(), 30000);
+  const abortFromCaller = () => timeoutController.abort(signal.reason);
+  signal?.addEventListener('abort', abortFromCaller, { once: true });
+  try {
+    const response = await fetch(`${NOMINATIM_URL}${path}`, {
+      headers: { Accept: 'application/json' },
+      signal: timeoutController.signal
+    });
+    if (!response.ok) throw new Error('Location search is temporarily unavailable.');
+    return await response.json();
+  } finally {
+    window.clearTimeout(timeout);
+    signal?.removeEventListener('abort', abortFromCaller);
+  }
 }
 
 function formatAddress(result) {

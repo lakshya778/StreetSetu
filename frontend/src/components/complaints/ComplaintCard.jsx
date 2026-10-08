@@ -9,9 +9,26 @@ export function statusLabel(status) {
   return statusLabels[status] || status;
 }
 
+function thumbnailUrl(image) {
+  const originalUrl = image?.url || image?.src;
+  if (!originalUrl) return '';
+  try {
+    const url = new URL(originalUrl);
+    if (url.hostname.endsWith('res.cloudinary.com')) {
+      url.pathname = url.pathname.replace('/upload/', '/upload/w_400,q_auto,f_auto/');
+      return url.toString();
+    }
+  } catch {
+    return originalUrl;
+  }
+  return originalUrl;
+}
+
 export default function ComplaintCard({ complaint }) {
+  const thumbnail = thumbnailUrl(complaint.attachments?.[0]);
   return (
     <Link to={`/dashboard/complaints/${complaint._id}`} className="complaint-card">
+      {thumbnail && <img className="complaint-card-thumbnail" src={thumbnail} alt="" loading="lazy" decoding="async" width="400" height="300" />}
       <div className="complaint-card-top">
         <span className={`status-dot status-${complaint.status}`} />
         <span className="complaint-status">{statusLabel(complaint.status)}</span>

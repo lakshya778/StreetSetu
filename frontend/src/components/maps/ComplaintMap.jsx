@@ -4,6 +4,7 @@ import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import ImageGallery from '../media/ImageGallery.jsx';
+import 'leaflet/dist/leaflet.css';
 
 const defaultCenter = [28.6139, 77.2090];
 const pinIcon = L.divIcon({

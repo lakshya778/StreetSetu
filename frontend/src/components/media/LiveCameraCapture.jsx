@@ -13,10 +13,17 @@ function geolocationPosition() {
 
 function canvasJpeg(canvas) {
   return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (blob) resolve(blob);
-      else reject(new Error('The captured photo could not be encoded. Please retake it.'));
-    }, 'image/jpeg', 0.92);
+    const qualities = [0.82, 0.74, 0.66, 0.58, 0.5];
+    const encode = (index) => canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error('The captured photo could not be encoded. Please retake it.'));
+      } else if (blob.size <= 600 * 1024 || index === qualities.length - 1) {
+        resolve(blob);
+      } else {
+        encode(index + 1);
+      }
+    }, 'image/jpeg', qualities[index]);
+    encode(0);
   });
 }
 
@@ -51,6 +58,16 @@ export default function LiveCameraCapture({ disabled = false, onSubmit }) {
   useEffect(() => {
     let active = true;
 
+    function stopCamera() {
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+      if (videoRef.current) {
+        videoRef.current.pause();
+        videoRef.current.srcObject = null;
+      }
+      setCameraReady(false);
+    }
+
     async function startCamera() {
       if (streamRef.current?.active || !videoRef.current) return;
       if (!navigator.mediaDevices?.getUserMedia) {
@@ -59,7 +76,7 @@ export default function LiveCameraCapture({ disabled = false, onSubmit }) {
       }
       try {
         const stream = await requestCameraStream();
-        if (!active) {
+        if (!active || document.visibilityState === 'hidden') {
           stream.getTracks().forEach((track) => track.stop());
           return;
         }
@@ -69,13 +86,24 @@ export default function LiveCameraCapture({ disabled = false, onSubmit }) {
       }
     }
 
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'hidden') {
+        stopCamera();
+      } else if (hasChecked && (cameraState === 'unknown' || (cameraState === 'granted' && locationState === 'granted')) && !photo) {
+        void startCamera();
+      }
+    }
+
     if (hasChecked && (cameraState === 'unknown' || (cameraState === 'granted' && locationState === 'granted'))) {
       void startCamera();
     }
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       active = false;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      stopCamera();
     };
-  }, [cameraRetry, cameraState, hasChecked, locationState]);
+  }, [cameraRetry, cameraState, hasChecked, locationState, photo]);
 
   useEffect(() => {
     if (cameraState === 'granted' && locationState === 'granted') {
@@ -105,8 +133,9 @@ export default function LiveCameraCapture({ disabled = false, onSubmit }) {
       if (!video || !canvas || !video.videoWidth || !video.videoHeight) {
         throw new Error('The camera is not ready yet. Wait for the preview and try again.');
       }
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+      const scale = Math.min(1, 1600 / Math.max(video.videoWidth, video.videoHeight));
+      canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+      canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
       const context = canvas.getContext('2d');
       if (!context) throw new Error('The camera image could not be prepared. Please try again.');
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -157,6 +186,10 @@ export default function LiveCameraCapture({ disabled = false, onSubmit }) {
           captureSource: 'live_camera'
         }
       });
+      video.pause();
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+      setCameraReady(false);
     } catch (captureError) {
       setError(captureError.message || 'The proof photo could not be captured. Please try again.');
     } finally {
@@ -168,14 +201,14 @@ export default function LiveCameraCapture({ disabled = false, onSubmit }) {
     let stream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false
       });
     } catch (cameraRequestError) {
       if (cameraRequestError?.name === 'NotAllowedError' || cameraRequestError?.name === 'SecurityError') {
         throw cameraRequestError;
       }
-      stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
     }
     return stream;
   }
@@ -274,6 +307,7 @@ export default function LiveCameraCapture({ disabled = false, onSubmit }) {
     setPhoto(null);
     setPreviewUrl('');
     setError('');
+    setCameraRetry((attempt) => attempt + 1);
   }
 
   return <div className="live-camera-capture">
@@ -285,7 +319,7 @@ export default function LiveCameraCapture({ disabled = false, onSubmit }) {
       onClose={closeGuide}
     />}
     <video ref={videoRef} className="live-camera-video" autoPlay muted playsInline hidden={Boolean(photo)} aria-label="Live camera preview" />
-    {photo && <img className="live-camera-preview" src={previewUrl} alt="Captured completion proof with StreetSetu location and time watermark" />}
+    {photo && <img className="live-camera-preview" src={previewUrl} alt="Captured completion proof with StreetSetu location and time watermark" loading="lazy" decoding="async" width="1280" height="720" />}
     <canvas ref={canvasRef} hidden />
     {(error || cameraError) && <p className="capture-error" role="alert">{error || cameraError}</p>}
     {(cameraState !== 'granted' || locationState !== 'granted') && guideDismissed && <button type="button" className="outline-button" onClick={() => setGuideDismissed(false)}>Permission help</button>}

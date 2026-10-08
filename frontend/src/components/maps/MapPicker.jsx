@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 const defaultCenter = [28.6139, 77.2090];
 const pinIcon = L.divIcon({

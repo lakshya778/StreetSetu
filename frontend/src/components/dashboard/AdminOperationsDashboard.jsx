@@ -4,6 +4,7 @@ import api, { getApiErrorMessage } from '../../api/client.js';
 import { getComplaints } from '../../api/complaints.js';
 import { useNotifications } from '../../context/NotificationContext.jsx';
 import DuplicateComplaintsPanel from './DuplicateComplaintsPanel.jsx';
+import SkeletonList from '../layout/SkeletonList.jsx';
 
 const STATUS_LABELS = {
   submitted: 'Submitted',
@@ -38,7 +39,7 @@ export default function AdminOperationsDashboard() {
     setLoading(true);
     const [summaryResult, recentResult] = await Promise.allSettled([
       api.get('/dashboard/summary'),
-      getComplaints({ page: 1, limit: 24 })
+      getComplaints({ page: 1, limit: 12 })
     ]);
     if (summaryResult.status === 'fulfilled') {
       setSummary(summaryResult.value.data.data);
@@ -131,7 +132,7 @@ export default function AdminOperationsDashboard() {
           <td data-label="Date">{formatDate(complaint.createdAt)}</td>
           <td data-label="Actions"><Link className="admin-review-link" to={`/dashboard/complaints/${complaint._id}`}>Review</Link></td>
         </tr>)}</tbody>
-      </table></div> : <div className="empty-table">{loading ? 'Loading recent complaints…' : recentError ? 'Recent complaints could not be shown.' : 'No recent complaints to review.'}</div>}
+      </table></div> : loading ? <SkeletonList rows={3} variant="row" /> : <div className="empty-table">{recentError ? 'Recent complaints could not be shown.' : 'No recent complaints to review.'}</div>}
     </section>
 
     <section className="panel admin-workflow-panel" aria-labelledby="workflow-summary-heading">

@@ -5,40 +5,99 @@ const SESSION_KEY = 'streetsetu_session';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1',
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json'
   },
   withCredentials: true
 });
+const pendingGetRequests = new Map();
+const slowRequestIds = new Set();
 
-function offlineCacheKey(config) {
+function transientRequestError(error) {
+  return !axios.isCancel(error) && error.code !== 'ERR_CANCELED'
+    && (!error.response || [502, 503, 504].includes(error.response.status));
+}
+
+function requestKey(config) {
+  return `${api.getUri(config)}|${config.headers?.Authorization || ''}`;
+}
+
+async function requestWithRetry(adapter, config) {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await adapter(config);
+    } catch (error) {
+      if (config.method?.toLowerCase() !== 'get' || attempt >= 2 || !transientRequestError(error) || navigator.onLine === false) throw error;
+      await new Promise((resolve) => window.setTimeout(resolve, 500 * (attempt + 1)));
+    }
+  }
+}
+
+function clearSlowRequest(config) {
+  if (!config?._streetSetuRequestId) return;
+  window.clearTimeout(config._streetSetuSlowTimer);
+  slowRequestIds.delete(config._streetSetuRequestId);
+  window.dispatchEvent(new CustomEvent('streetsetu:request-settled', { detail: { count: slowRequestIds.size } }));
+  delete config._streetSetuRequestId;
+}
+
+async function deduplicatedGetAdapter(config, adapter) {
+  if (config.method?.toLowerCase() !== 'get' || config.signal) return requestWithRetry(adapter, config);
+  const key = requestKey(config);
+  const inFlight = pendingGetRequests.get(key);
+  if (inFlight) {
+    const response = await inFlight;
+    return { ...response, config, headers: { ...response.headers } };
+  }
+
+  const request = requestWithRetry(adapter, config);
+  pendingGetRequests.set(key, request);
+  try {
+    return await request;
+  } finally {
+    if (pendingGetRequests.get(key) === request) pendingGetRequests.delete(key);
+  }
+}
+
+function offlineCacheEntry(config) {
   if (config.method?.toLowerCase() !== 'get') return null;
   const userId = getCurrentUserId();
-  if (!userId) return null;
   try {
     const url = new URL(api.getUri(config));
-    if (!['/dashboard/summary', '/complaints', '/notifications'].includes(url.pathname.replace('/api/v1', ''))) return null;
-    url.searchParams.set('__streetsetu_user', userId);
-    return new Request(url.toString(), { method: 'GET', headers: { Accept: 'application/json' } });
+    const isPublicEndpoint = url.pathname.includes('/public/');
+    if (!userId && !isPublicEndpoint) return null;
+    if (userId) url.searchParams.set('__streetsetu_user', userId);
+    return {
+      cacheName: userId ? `streetsetu-private-v1-${userId}` : 'streetsetu-public-api-v1',
+      key: new Request(url.toString(), { method: 'GET', headers: { Accept: 'application/json' } })
+    };
   } catch { return null; }
 }
 
 async function cacheApiResponse(response) {
-  const key = offlineCacheKey(response.config);
-  if (!key || typeof caches === 'undefined') return;
+  const entry = offlineCacheEntry(response.config);
+  if (!entry || typeof caches === 'undefined') return;
   try {
-    const cache = await caches.open(`streetsetu-private-v1-${getCurrentUserId()}`);
-    await cache.put(key, new Response(JSON.stringify(response.data), { headers: { 'Content-Type': 'application/json' } }));
+    const cache = await caches.open(entry.cacheName);
+    await cache.put(entry.key, new Response(JSON.stringify(response.data), {
+      headers: { 'Content-Type': 'application/json', 'x-streetsetu-cached-at': String(Date.now()) }
+    }));
   } catch { /* Offline support is best effort when storage is full or unavailable. */ }
 }
 
 async function readOfflineApiResponse(error) {
-  const key = offlineCacheKey(error.config || {});
-  if (!key || typeof caches === 'undefined') return null;
+  const entry = offlineCacheEntry(error.config || {});
+  if (!entry || typeof caches === 'undefined') return null;
   try {
-    const cache = await caches.open(`streetsetu-private-v1-${getCurrentUserId()}`);
-    const cached = await cache.match(key);
+    const cache = await caches.open(entry.cacheName);
+    const cached = await cache.match(entry.key);
     if (!cached) return null;
+    const cachedAt = Number(cached.headers.get('x-streetsetu-cached-at'));
+    if (!cachedAt || Date.now() - cachedAt > 5 * 60 * 1000) {
+      await cache.delete(entry.key);
+      return null;
+    }
     return { data: await cached.json(), status: 200, statusText: 'OK (offline cache)', headers: {}, config: error.config, request: error.request };
   } catch { return null; }
 }
@@ -72,7 +131,7 @@ export async function ensureAccessToken() {
   if (currentToken) return currentToken;
 
   try {
-    refreshRequest ||= axios.post(`${api.defaults.baseURL}/auth/refresh`, {}, { withCredentials: true });
+    refreshRequest ||= axios.post(`${api.defaults.baseURL}/auth/refresh`, {}, { withCredentials: true, timeout: 30000 });
     const { data } = await refreshRequest;
     const accessToken = data.data.accessToken || data.data.token;
     if (!accessToken) throw new Error('The refresh response did not include an access token');
@@ -95,6 +154,13 @@ api.interceptors.request.use(async (config) => {
     token = await ensureAccessToken();
   }
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  const adapter = axios.getAdapter(config.adapter || api.defaults.adapter);
+  config.adapter = (requestConfig) => deduplicatedGetAdapter(requestConfig, adapter);
+  config._streetSetuRequestId = `${Date.now()}-${Math.random()}`;
+  config._streetSetuSlowTimer = window.setTimeout(() => {
+    slowRequestIds.add(config._streetSetuRequestId);
+    window.dispatchEvent(new CustomEvent('streetsetu:request-slow', { detail: { count: slowRequestIds.size } }));
+  }, 5000);
   return config;
 });
 
@@ -103,10 +169,12 @@ export function getApiErrorMessage(error, fallback = 'Something went wrong. Plea
 }
 
 api.interceptors.response.use(async (response) => {
-  await cacheApiResponse(response);
+  clearSlowRequest(response.config);
+  if (response.statusText !== 'OK (offline cache)') await cacheApiResponse(response);
   return response;
 }, async (error) => {
-  if (!error.response) {
+  clearSlowRequest(error.config);
+  if (!error.response || [502, 503, 504].includes(error.response.status)) {
     const cached = await readOfflineApiResponse(error);
     if (cached) return cached;
   }
@@ -119,7 +187,7 @@ api.interceptors.response.use(async (response) => {
   }
   original._retry = true;
   try {
-    refreshRequest ||= axios.post(`${api.defaults.baseURL}/auth/refresh`, {}, { withCredentials: true });
+    refreshRequest ||= axios.post(`${api.defaults.baseURL}/auth/refresh`, {}, { withCredentials: true, timeout: 30000 });
     const { data } = await refreshRequest;
     const accessToken = data.data.accessToken || data.data.token;
     storeAccessToken(accessToken);

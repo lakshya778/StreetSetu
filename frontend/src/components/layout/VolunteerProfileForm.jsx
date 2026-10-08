@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import api from '../../api/client.js';
 import { complaintCategories } from '../../api/complaints.js';
-import MapPicker from '../maps/MapPicker.jsx';
+import MapPicker from '../maps/LazyMapPicker.jsx';
 
 const availabilityOptions = [
   { value: 'available', label: 'Available' },

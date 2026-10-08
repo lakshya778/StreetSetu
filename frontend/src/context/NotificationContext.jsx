@@ -23,7 +23,7 @@ export function NotificationProvider({ children }) {
     setError('');
     try {
       const [preview, unread] = await Promise.all([
-        getNotifications({ page: 1, limit: 20 }),
+        getNotifications({ page: 1, limit: 12 }),
         getNotifications({ page: 1, limit: 1, unread: true })
       ]);
       setNotifications(preview.items || []);

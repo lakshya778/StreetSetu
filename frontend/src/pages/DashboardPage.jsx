@@ -1,9 +1,9 @@
-﻿import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import api, { getApiErrorMessage } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useNotifications } from '../context/NotificationContext.jsx';
-import AdminOperationsDashboard from '../components/dashboard/AdminOperationsDashboard.jsx';
+const AdminOperationsDashboard = lazy(() => import('../components/dashboard/AdminOperationsDashboard.jsx'));
 
 const emptySummary = {
   totalComplaints: 0, openComplaints: 0, resolvedComplaints: 0, rejectedComplaints: 0, rejectionRate: 0,
@@ -13,7 +13,7 @@ const STATUS_COLORS = ['#83a978', '#e4aa63', '#7fa8bd', '#9478a5', '#5e896b', '#
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  if (user?.role === 'admin') return <AdminOperationsDashboard />;
+  if (user?.role === 'admin') return <Suspense fallback={<div className="page-skeleton" role="status" aria-label="Loading admin dashboard"><span /><span /><span /></div>}><AdminOperationsDashboard /></Suspense>;
   return <CommunityDashboard user={user} />;
 }
 

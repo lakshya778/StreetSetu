@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { MapContainer, Marker, Polyline, Popup, TileLayer } from 'react-leaflet';
 import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 const fallbackCenter = [28.6139, 77.2090];
 const assignmentIcon = L.divIcon({ className: 'streetsetu-pin-wrapper', html: '<span class="streetsetu-pin"></span>', iconSize: [24, 32], iconAnchor: [12, 30] });
