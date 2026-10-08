@@ -98,5 +98,22 @@ export default function CreateComplaintPage() {
       {error && <div className="form-error" role="alert">{error}</div>}
       <div className="form-actions"><Link className="outline-button" to="/dashboard/complaints">Cancel</Link><button className="primary-button compact-button" type="submit" disabled={isSubmitting || createdComplaint}>{isSubmitting ? 'Submitting...' : createdComplaint ? 'Complaint submitted' : 'Submit complaint'} <span>→</span></button></div>
     </form>
+    <aside className="report-guidance panel">
+      <section>
+        <p className="eyebrow">Make it actionable</p>
+        <h2>Tips for a good report</h2>
+        <ul className="report-tips-list">
+          <li><span aria-hidden="true">✓</span><span><strong>Clear title</strong><small>Describe the issue in a few words.</small></span></li>
+          <li><span aria-hidden="true">✓</span><span><strong>Exact location</strong><small>Pinpoint where the issue needs attention.</small></span></li>
+          <li><span aria-hidden="true">✓</span><span><strong>Add a photo</strong><small>Show the issue clearly when possible.</small></span></li>
+        </ul>
+      </section>
+      <section className="report-steps">
+        <p className="eyebrow">What happens next</p>
+        <h2>How it works</h2>
+        <ol><li><span>1</span><strong>Report</strong></li><li><span>2</span><strong>Assigned</strong></li><li><span>3</span><strong>Resolved with proof</strong></li></ol>
+      </section>
+      <p className="report-privacy-note"><strong>Your privacy matters.</strong> Location and photos are used to help verify and resolve your report.</p>
+    </aside>
   </div>;
 }
