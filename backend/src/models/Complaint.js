@@ -29,6 +29,7 @@ const attachmentSchema = new mongoose.Schema(
     imageMetadata: {
       latitude: { type: Number, min: -90, max: 90 },
       longitude: { type: Number, min: -180, max: 180 },
+      accuracy: { type: Number, min: 0 },
       capturedAt: { type: Date }
     }
   },
@@ -63,6 +64,12 @@ const statusHistorySchema = new mongoose.Schema(
     changedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     assignedVolunteer: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     note: { type: String, trim: true, maxlength: 1000 },
+    captureSource: { type: String, enum: ['live_camera', 'dev_gallery'] },
+    proofHashes: [{ type: String, trim: true, minlength: 64, maxlength: 64 }],
+    gpsSource: { type: String, enum: ['device'] },
+    distance: { type: Number, min: 0 },
+    accuracy: { type: Number, min: 0 },
+    capturedAt: { type: Date },
     changedAt: { type: Date, default: Date.now }
   },
   { _id: false }

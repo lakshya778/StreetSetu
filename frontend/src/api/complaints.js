@@ -78,10 +78,15 @@ export async function mergeDuplicateComplaint(id, masterComplaintId) {
   return data.data;
 }
 
-export async function uploadWorkEvidence(complaintId, stage, files) {
+export async function uploadWorkEvidence(complaintId, stage, files, captureMetadata = {}) {
   if (!['before', 'after'].includes(stage)) throw new Error('Evidence stage must be before or after');
   const formData = new FormData();
   files.forEach((file) => formData.append('images', file));
+  if (stage === 'after') {
+    Object.entries(captureMetadata).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') formData.append(key, String(value));
+    });
+  }
   const { data } = await api.post(`/uploads/complaints/${complaintId}/${stage}-images`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   });

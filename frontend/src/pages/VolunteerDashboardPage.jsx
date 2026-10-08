@@ -7,6 +7,8 @@ import { getCompletionVerification, getMyAssignments, getMyOptimizedRoute, respo
 import { uploadWorkEvidence } from '../api/complaints.js';
 import ImageGallery from '../components/media/ImageGallery.jsx';
 import ImageUploader from '../components/media/ImageUploader.jsx';
+import LiveCameraCapture from '../components/media/LiveCameraCapture.jsx';
+import DevGalleryProof from '../components/media/DevGalleryProof.jsx';
 import ComplaintMap from '../components/maps/ComplaintMap.jsx';
 import VolunteerRouteMap from '../components/maps/VolunteerRouteMap.jsx';
 import RouteSummaryCard from '../components/dashboard/RouteSummaryCard.jsx';
@@ -79,12 +81,12 @@ export default function VolunteerDashboardPage() {
     catch (requestError) { setError(getApiErrorMessage(requestError, 'The route could not be recalculated.')); }
   }
 
-  async function handleStatusChange(complaintId, status, stage, files) {
+  async function handleStatusChange(complaintId, status, stage, files, captureMetadata = {}) {
     setUpdatingId(complaintId);
     setError('');
     try {
       if (files.length) {
-        const evidenceResult = await uploadWorkEvidence(complaintId, stage, files);
+        const evidenceResult = await uploadWorkEvidence(complaintId, stage, files, captureMetadata);
         const returnedBeforeImages = evidenceResult.workStartPhotos || evidenceResult.beforeImages || [];
         const returnedAfterImages = evidenceResult.completionPhotos || evidenceResult.afterImages || [];
         console.info('[Evidence] refreshed from upload response', {
@@ -225,7 +227,7 @@ function AssignmentCard({ assignment, evidenceFiles, onEvidenceChange, updatingI
       {isResolved && <span className="status-badge resolved-badge">Resolved</span>}
       {!nextStatus && !isResolved && <Link className="assignment-action" to={`/dashboard/complaints/${complaint._id}`}>View details <span>→</span></Link>}
     </div>
-    {nextStatus && !(evidenceStage === 'after' && completionPhotosCount > 0) && <div className="assignment-evidence-step"><strong>{evidenceStage === 'before' ? 'Before starting' : 'Before submitting for review'}</strong><ImageGallery images={savedEvidence} label={evidenceStage === 'before' ? 'Work-start evidence' : 'Completion evidence'} compact /><ImageUploader files={evidenceFiles} onChange={onEvidenceChange} disabled={updatingId === complaint._id} label={evidenceStage === 'before' ? 'Add work-start image' : 'Add completion image'} /><button className="assignment-action evidence-submit-button" disabled={updatingId === complaint._id || !evidenceFiles.length} onClick={() => onStatusChange(complaint._id, nextStatus, evidenceStage, evidenceFiles)}>{updatingId === complaint._id ? 'Saving...' : evidenceStage === 'before' ? `Upload & mark ${statusLabel(nextStatus)}` : 'Upload completion photos'}</button></div>}
+    {nextStatus && !(evidenceStage === 'after' && completionPhotosCount > 0) && <div className="assignment-evidence-step"><strong>{evidenceStage === 'before' ? 'Before starting' : 'Before submitting for review'}</strong><ImageGallery images={savedEvidence} label={evidenceStage === 'before' ? 'Work-start evidence' : 'Completion evidence'} compact />{evidenceStage === 'before' ? <><ImageUploader files={evidenceFiles} onChange={onEvidenceChange} disabled={updatingId === complaint._id} label="Add work-start image" /><button className="assignment-action evidence-submit-button" disabled={updatingId === complaint._id || !evidenceFiles.length} onClick={() => onStatusChange(complaint._id, nextStatus, evidenceStage, evidenceFiles)}>{updatingId === complaint._id ? 'Saving...' : `Upload & mark ${statusLabel(nextStatus)}`}</button></> : <><LiveCameraCapture disabled={updatingId === complaint._id} onSubmit={(file, metadata) => onStatusChange(complaint._id, nextStatus, evidenceStage, [file], metadata)} /><DevGalleryProof disabled={updatingId === complaint._id} onSubmit={(file, metadata) => onStatusChange(complaint._id, nextStatus, evidenceStage, [file], metadata)} /></>}</div>}
     {needsReview && <div className="assignment-response-actions"><p>Completion photos are waiting for admin review.</p></div>}
     {needsResponse && <div className="assignment-response-actions"><p>This assignment is awaiting your response.</p><button className="primary-button compact-button" disabled={updatingId === complaint._id} onClick={() => onAssignmentResponse(complaint._id, 'accepted')}>Accept assignment</button><button className="outline-button" disabled={updatingId === complaint._id} onClick={() => onAssignmentResponse(complaint._id, 'declined')}>Decline</button></div>}
   </article>;

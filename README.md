@@ -40,8 +40,8 @@ Civic issues are often reported across disconnected channels, with limited locat
 | Rejection workflow | Admin rejection from eligible review states with required reason, `rejectedAt`, `rejectedBy`, status history, and audit record. |
 | Volunteer assignment | Admin assignment/reassignment and volunteer assignment list/status updates. |
 | Smart recommendations | Top-five volunteer recommendations weighted by proximity (50%), active workload (25%), resolution rate (15%), and availability (10%). Admins can review, assign manually, or auto-assign the highest-ranked available volunteer. |
-| Work evidence and images | Cloudinary-backed image upload configuration; complaint images and before/after work evidence are stored as attachment metadata. The configured defaults allow up to five files of 5 MiB each. |
-| Completion verification | Python service preserves the verification API response and sends completion evidence to manual admin review. Visual embedding inference and runtime model downloads are disabled to keep memory use low. |
+| Work evidence and images | Cloudinary-backed image upload configuration; complaint images and work-start evidence remain file uploads. Completion proof is captured by the live camera with a device GPS/time watermark and stored with its capture metadata. |
+| Completion verification | Device time, GPS distance and accuracy are checked before the existing verification flow; flagged proofs require admin review. Development gallery proofs are review-only and gated by local development flags. |
 | Location support | GeoJSON point coordinates, Leaflet/OpenStreetMap maps, map complaint listing, and nearby complaint lookup. |
 | Notifications | In-app and reusable HTML/text SMTP email updates for submission, assignment, resolution, rejection, and volunteer assignment; Socket.IO sends live in-app updates. |
 | Real-time updates | Socket.IO with JWT authentication, user/role rooms, authorized complaint subscriptions, and complaint/dashboard update events. |
@@ -68,7 +68,7 @@ AI classification and volunteer recommendations are decision-support features. A
 
 - View assigned complaints and update their work status.
 - Accept or decline assignments; see the average citizen rating on the volunteer dashboard.
-- Add work-start and completion photos before moving a complaint into progress or resolving it.
+- Add work-start photos before moving a complaint into progress and submit completion proof through the live camera, with device location and capture time.
 - Maintain volunteer expertise and location details used by assignment recommendations.
 
 ### Admin

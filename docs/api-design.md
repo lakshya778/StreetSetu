@@ -60,18 +60,18 @@ Existing complaint endpoints and response envelopes remain unchanged. Complaint 
 
 - `POST /api/v1/uploads/images` (authenticated): multipart form field `images`, 1–5 JPG/JPEG/PNG/WebP files, at most 5 MiB each. Returns metadata records with `url`, `mimeType`, `fileName`, `size`, `storageKey`, and `uploadedAt`; pass these records in the existing complaint `attachments` field when creating a complaint.
 - `POST /api/v1/uploads/complaints/:complaintId/before-images` (assigned volunteer): multipart `images`; appends work-start evidence.
-- `POST /api/v1/uploads/complaints/:complaintId/after-images` (assigned volunteer): multipart `images`; appends completion evidence.
+- `POST /api/v1/uploads/complaints/:complaintId/after-images` (assigned volunteer): multipart `images`, `captureSource=live_camera`, `latitude`, `longitude`, `accuracy`, and ISO `capturedAt`. Browser clients must capture with the live camera and attach a geotag/time watermark. Captures more than two minutes from server time, over 100 m from the reported point, or with GPS accuracy over 100 m are marked `needs_review`. The response rejects missing/unsupported sources. `dev_gallery` is accepted only when `ALLOW_DEV_GALLERY_PROOF=true` and `NODE_ENV` is not `production`; development gallery evidence is always review-only.
 
 Cloudinary configuration uses `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, and optional `CLOUDINARY_UPLOAD_FOLDER`. Volunteer status changes to `in_progress` and `resolved` require the corresponding evidence.
 
 ### AI completion verification
 
-- Each uploaded work image is sent to the internal Python AI service for EXIF GPS and capture-time extraction. The parsed metadata is stored beside the attachment in the complaint document.
-- When after evidence exists, the API persists `completionVerification.verificationStatus: pending` and starts verification asynchronously. The worker compares before/after image embeddings with OpenAI CLIP, requires every evidence image GPS point to be within 200 m of the complaint, and checks capture times for presence, plausible age, and before/after order.
+- Work-start images retain optional EXIF GPS and capture-time metadata. Live completion captures use device geolocation and client capture time as the primary proof metadata; EXIF metadata is not required for a capture to pass those checks.
+- When a live after capture passes the device time, distance, and accuracy checks and work-start evidence exists, the API persists `completionVerification.verificationStatus: pending` and starts AI verification asynchronously. Failed live checks are stored directly as `needs_review` with the matching failure reason. The worker compares before/after image embeddings with OpenAI CLIP; the server-side 100 m device GPS check remains authoritative for completion proof.
 - `GET /api/v1/assignments/completion-verifications/:complaintId` (assigned volunteer or admin): returns verification fields; checking a pending record also resumes processing after an API restart.
 - `GET /api/v1/assignments/completion-verifications` (admin): returns the latest 100 verified, pending, and review-required complaints.
 - `PATCH /api/v1/assignments/completion-verifications/:complaintId` (admin): accepts `{ "decision": "approve" | "reject" }`. Approval marks the evidence verified; rejection keeps it in review. Both decisions are audited.
-- Volunteers cannot move a complaint to `resolved` until verification is `verified`. Pending checks return `409 VERIFICATION_PENDING`; flagged or unavailable checks return `409 VERIFICATION_NEEDS_REVIEW`. Admin review approval allows the volunteer to retry the existing resolve action.
+- Volunteers cannot move a complaint to `resolved` until verification is `verified`. Pending checks return `409 VERIFICATION_PENDING`; flagged or unavailable checks return `409 VERIFICATION_NEEDS_REVIEW`. Admin review approval allows the volunteer to retry the existing resolve action. Development gallery evidence cannot be approved as verified.
 - Verification data is additive and optional, so legacy complaint reads remain backward compatible. The internal AI API exposes `POST /v1/image-metadata` (multipart `image`) and `POST /v1/verify-completion` (internal JSON payload); both honor `AI_SERVICE_TOKEN`.
 
 ### Volunteer profile and recommendations

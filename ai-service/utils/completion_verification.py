@@ -59,22 +59,23 @@ def _metadata_checks(before_images, after_images, complaint_latitude, complaint_
                 gps_distances.append(None)
         capture_times.append(_as_datetime(metadata.get("capturedAt")))
 
-    gps_matched = len(gps_distances) == len(all_images) and all(
-        distance is not None and distance <= MAX_GPS_DISTANCE_METERS
-        for distance in gps_distances
-    )
     available_distances = [distance for distance in gps_distances if distance is not None]
+    gps_matched = (
+        all(distance <= MAX_GPS_DISTANCE_METERS for distance in available_distances)
+        if available_distances else None
+    )
     gps_distance = round(max(available_distances), 1) if available_distances else None
-    timestamp_valid = all(value is not None for value in capture_times)
-
-    if timestamp_valid:
-        before_times = capture_times[:len(before_images)]
-        after_times = capture_times[len(before_images):]
-        timestamp_valid = max(before_times) <= min(after_times)
-        timestamp_valid = timestamp_valid and all(
+    available_capture_times = [value for value in capture_times if value is not None]
+    timestamp_valid = None
+    if available_capture_times:
+        timestamp_valid = all(
             now - MAX_IMAGE_AGE <= value <= now + timedelta(minutes=5)
-            for value in capture_times
+            for value in available_capture_times
         )
+        before_times = [value for value in capture_times[:len(before_images)] if value is not None]
+        after_times = [value for value in capture_times[len(before_images):] if value is not None]
+        if before_times and after_times:
+            timestamp_valid = timestamp_valid and max(before_times) <= min(after_times)
 
     return gps_matched, gps_distance, timestamp_valid
 

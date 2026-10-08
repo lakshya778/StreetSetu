@@ -183,6 +183,15 @@ h1, h2, p { margin-top: 0; }
 .image-gallery img { width: 100%; height: 100%; object-fit: cover; }
 .image-gallery button { position: absolute; top: 4px; right: 4px; border: 0; border-radius: 50%; width: 23px; height: 23px; color: white; background: #904e43; }
 .complaint-detail-location, .evidence-comparison { margin-top: 18px; }
+.completion-proof-trust { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; padding: 11px; border-radius: 7px; background: #f3f7f1; color: #526b5d; font-size: 11px; }
+.completion-proof-trust p { margin: 0; }
+.live-camera-capture, .dev-gallery-proof { display: grid; gap: 10px; margin-top: 10px; }
+.live-camera-preview { width: min(100%, 520px); max-height: 340px; object-fit: contain; border-radius: 8px; background: #17231e; }
+.live-camera-video { width: min(100%, 520px); max-height: 340px; border-radius: 8px; background: #17231e; object-fit: cover; }
+.capture-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.capture-error { margin: 0; color: #a34c40; font-size: 11px; }
+.dev-gallery-banner { margin: 0; color: #916328; font-size: 10px; font-weight: 700; }
+.dev-gallery-proof input { max-width: 100%; font-size: 11px; }
 .complaint-detail-map { height: 310px; }
 .evidence-comparison-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 .evidence-comparison-grid h3 { color: #627a6e; font-size: 12px; }

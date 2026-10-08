@@ -175,6 +175,7 @@ export default function ComplaintDetailsPage() {
   if (!complaint) return <section className="complaint-load-error" role="alert"><h1>Unable to load complaint details.</h1><p>{loadError || 'The complaint may be unavailable or you may not have access to it.'}</p><div><button type="button" className="primary-button compact-button" onClick={() => void loadComplaint()}>Retry</button><button type="button" className="outline-button" onClick={() => navigate('/dashboard/complaints', { replace: true })}>Back to complaints</button></div></section>;
 
   const history = Array.isArray(complaint.statusHistory) ? complaint.statusHistory.filter(Boolean) : [];
+  const latestProof = history.slice().reverse().find((event) => event.captureSource);
   const canLeaveFeedback = user?.role === 'citizen'
     && String(complaint.createdBy?._id || complaint.createdBy) === String(user?._id)
     && ['resolved', 'closed'].includes(complaint.status)
@@ -205,6 +206,14 @@ export default function ComplaintDetailsPage() {
           {complaint.address && <div className="location-block"><span>⌖</span><div><strong>{complaint.address}</strong><small>{complaint.latitude}, {complaint.longitude}</small></div></div>}
           {Array.isArray(complaint.attachments) && complaint.attachments.length > 0 && <div className="complaint-evidence"><h2>Reported photos</h2><ImageGallery images={complaint.attachments} label="Reported complaint images" /></div>}
           <CompletionVerificationStatus verification={complaint.completionVerification} />
+          {latestProof && <div className="completion-proof-trust">
+            <p>{latestProof.captureSource === 'live_camera'
+              ? `Photo taken at ${formatDate(latestProof.capturedAt, 'datetime')}, ${Number.isFinite(Number(latestProof.distance)) ? `${Math.round(Number(latestProof.distance))} m` : 'distance unavailable'} from reported spot`
+              : `DEV gallery photo uploaded at ${formatDate(latestProof.changedAt, 'datetime')}`}</p>
+            <span className={`status-badge ${complaint.completionVerification?.verificationStatus === 'verified' ? 'resolved-badge' : ''}`}>
+              {complaint.completionVerification?.verificationStatus === 'verified' ? 'Verified' : 'Needs review'}
+            </span>
+          </div>}
         </section>
         <aside className="panel history-panel">
           <div className="panel-heading"><div><p className="eyebrow">The paper trail</p><h2>Status history</h2></div></div>
@@ -265,7 +274,9 @@ function displayCategory(category) {
 
 function formatDate(value, style) {
   if (!value || Number.isNaN(new Date(value).getTime())) return 'date unavailable';
-  const options = style === 'date'
+  const options = style === 'datetime'
+    ? { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }
+    : style === 'date'
     ? { day: 'numeric', month: 'long', year: 'numeric' }
     : { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' };
   return new Date(value).toLocaleString('en-IN', options);

@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { createHash } from 'node:crypto';
 import Assignment from '../models/Assignment.js';
 import Complaint from '../models/Complaint.js';
 import { notifyComplaintImagesUploaded } from './notificationService.js';
@@ -12,6 +13,37 @@ function evidenceError(message, statusCode = 400, code = 'EVIDENCE_ERROR') {
   error.statusCode = statusCode;
   error.code = code;
   return error;
+}
+
+function haversineDistanceMeters(latitudeA, longitudeA, latitudeB, longitudeB) {
+  const radians = (degrees) => (degrees * Math.PI) / 180;
+  const latitudeDelta = radians(latitudeB - latitudeA);
+  const longitudeDelta = radians(longitudeB - longitudeA);
+  const a = Math.sin(latitudeDelta / 2) ** 2
+    + Math.cos(radians(latitudeA)) * Math.cos(radians(latitudeB)) * Math.sin(longitudeDelta / 2) ** 2;
+  const boundedA = Math.min(1, a);
+  return 6371000 * 2 * Math.atan2(Math.sqrt(boundedA), Math.sqrt(1 - boundedA));
+}
+
+function parseLiveCapture(body) {
+  if (['latitude', 'longitude', 'accuracy', 'capturedAt'].some((field) => (
+    typeof body[field] !== 'string' || body[field].trim() === ''
+  ))) {
+    throw evidenceError('Valid live camera location and capture time are required', 400, 'INVALID_CAPTURE_METADATA');
+  }
+  const latitude = Number(body.latitude);
+  const longitude = Number(body.longitude);
+  const accuracy = Number(body.accuracy);
+  const capturedAt = new Date(body.capturedAt);
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90
+    || !Number.isFinite(longitude) || longitude < -180 || longitude > 180
+    || !Number.isFinite(accuracy) || accuracy < 0
+    || typeof body.capturedAt !== 'string'
+    || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(body.capturedAt)
+    || Number.isNaN(capturedAt.getTime())) {
+    throw evidenceError('Valid live camera location and capture time are required', 400, 'INVALID_CAPTURE_METADATA');
+  }
+  return { latitude, longitude, accuracy, capturedAt };
 }
 
 export async function addWorkEvidence({ complaintId, stage, files, req }) {
@@ -39,12 +71,37 @@ export async function addWorkEvidence({ complaintId, stage, files, req }) {
     throw evidenceError(`Upload ${stage} images while the complaint is ${expectedStatus.replaceAll('_', ' ')}`, 409, 'INVALID_STATUS');
   }
 
+  let captureSource;
+  let liveCapture;
+  let receivedAt;
+  if (stage === 'after') {
+    captureSource = req.body.captureSource;
+    if (captureSource === 'dev_gallery') {
+      if (process.env.ALLOW_DEV_GALLERY_PROOF !== 'true' || process.env.NODE_ENV === 'production') {
+        throw evidenceError('Live camera capture required', 400, 'LIVE_CAMERA_REQUIRED');
+      }
+    } else if (captureSource === 'live_camera') {
+      liveCapture = parseLiveCapture(req.body);
+      receivedAt = new Date();
+    } else {
+      throw evidenceError('Live camera capture required', 400, 'LIVE_CAMERA_REQUIRED');
+    }
+  }
+
   const target = stage === 'before' ? complaint.beforeImages : complaint.afterImages;
   if (target.length + files.length > 5) {
     throw evidenceError(`A maximum of 5 ${stage} images can be attached to one complaint`, 400, 'UPLOAD_VALIDATION_ERROR');
   }
 
-  const metadataByFile = await Promise.all(files.map((file) => extractEvidenceMetadata(file)));
+  const exifMetadata = await Promise.all(files.map((file) => extractEvidenceMetadata(file)));
+  const metadataByFile = stage === 'after' && captureSource === 'live_camera'
+    ? files.map(() => ({
+      latitude: liveCapture.latitude,
+      longitude: liveCapture.longitude,
+      accuracy: liveCapture.accuracy,
+      capturedAt: liveCapture.capturedAt
+    }))
+    : exifMetadata;
   const uploaded = await uploadImagesToCloudinary(files, req.user.sub, {
     purpose: 'work-evidence',
     complaintId: complaint._id
@@ -75,7 +132,18 @@ export async function addWorkEvidence({ complaintId, stage, files, req }) {
   }
   target.splice(0, target.length, ...uniqueExisting, ...evidence);
   const previousStatus = complaint.status;
+  let verificationFailureReason = null;
+  let distance = null;
   if (stage === 'after') {
+    if (captureSource === 'dev_gallery') {
+      verificationFailureReason = 'Development gallery evidence needs admin review.';
+    } else {
+      const timeDifference = Math.abs(receivedAt.getTime() - liveCapture.capturedAt.getTime());
+      distance = haversineDistanceMeters(complaint.latitude, complaint.longitude, liveCapture.latitude, liveCapture.longitude);
+      if (timeDifference > 2 * 60 * 1000) verificationFailureReason = 'Capture time mismatch';
+      else if (distance > 100) verificationFailureReason = `Photo taken ${Math.round(distance)} m away from reported location`;
+      else if (liveCapture.accuracy > 100) verificationFailureReason = 'Low GPS accuracy';
+    }
     complaint.status = 'needs_review';
     complaint.statusHistory.push({
       eventType: 'status_changed',
@@ -83,9 +151,28 @@ export async function addWorkEvidence({ complaintId, stage, files, req }) {
       status: 'needs_review',
       changedBy: volunteerId,
       assignedVolunteer: volunteerId,
-      note: 'Completion photos submitted for review',
-      changedAt: new Date()
+      note: verificationFailureReason || 'Completion photos submitted for verification',
+      captureSource,
+      proofHashes: files.map((file) => createHash('sha256').update(file.buffer).digest('hex')),
+      ...(captureSource === 'live_camera' ? {
+        gpsSource: 'device',
+        distance,
+        accuracy: liveCapture.accuracy,
+        capturedAt: liveCapture.capturedAt
+      } : {}),
+      changedAt: receivedAt || new Date()
     });
+    if (verificationFailureReason) {
+      complaint.completionVerification = {
+        verificationStatus: 'needs_review',
+        failureReason: verificationFailureReason,
+        requestedAt: receivedAt || new Date(),
+        checkedAt: receivedAt || new Date(),
+        gpsMatched: captureSource === 'live_camera' ? distance <= 100 : undefined,
+        gpsDistanceMeters: distance ?? undefined,
+        timestampValid: captureSource === 'live_camera' ? Math.abs(receivedAt.getTime() - liveCapture.capturedAt.getTime()) <= 2 * 60 * 1000 : undefined
+      };
+    }
   }
 
   try {
@@ -102,7 +189,7 @@ export async function addWorkEvidence({ complaintId, stage, files, req }) {
   }
 
   await recordAudit({ req, action: 'complaint.evidence_uploaded', entityType: 'complaint', entityId: complaint._id, previousValue: stage === 'after' ? previousStatus : undefined, newValue: stage === 'after' ? 'needs_review' : undefined, metadata: { stage, count: evidence.length } });
-  if (stage === 'after' && complaint.beforeImages.length > 0) {
+  if (stage === 'after' && !verificationFailureReason && complaint.beforeImages.length > 0) {
     complaint.completionVerification = await queueCompletionVerification(complaint._id);
   }
   publishComplaintUpdate(complaint, 'complaint:status');
