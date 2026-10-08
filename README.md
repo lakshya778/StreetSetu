@@ -19,7 +19,7 @@ Civic issues are often reported across disconnected channels, with limited locat
 - Complaint lifecycle with a reasoned rejection path and recorded status history.
 - Admin assignment, reassignment, and ranked volunteer recommendations.
 - Volunteer work-start and completion evidence uploads.
-- Asynchronous CLIP completion verification with EXIF GPS/time checks and an admin evidence review queue.
+- Lightweight completion metadata checks with admin evidence review; visual similarity inference is disabled on small-instance deployments.
 - In-app notifications, optional email delivery, and Socket.IO updates.
 - Complaint maps, nearby issue lookup, and dashboard analytics.
 - Citizen nearby complaint discovery before submission with 500 m, 1 km, and 5 km search radii.
@@ -41,7 +41,7 @@ Civic issues are often reported across disconnected channels, with limited locat
 | Volunteer assignment | Admin assignment/reassignment and volunteer assignment list/status updates. |
 | Smart recommendations | Top-five volunteer recommendations weighted by proximity (50%), active workload (25%), resolution rate (15%), and availability (10%). Admins can review, assign manually, or auto-assign the highest-ranked available volunteer. |
 | Work evidence and images | Cloudinary-backed image upload configuration; complaint images and before/after work evidence are stored as attachment metadata. The configured defaults allow up to five files of 5 MiB each. |
-| Completion verification | Python AI service compares before/after OpenAI CLIP embeddings, checks image GPS against the complaint within 200 m, validates EXIF timestamp order, persists a fraud score, and blocks volunteer resolution until verified or approved by an admin. |
+| Completion verification | Python service preserves the verification API response and sends completion evidence to manual admin review. Visual embedding inference and runtime model downloads are disabled to keep memory use low. |
 | Location support | GeoJSON point coordinates, Leaflet/OpenStreetMap maps, map complaint listing, and nearby complaint lookup. |
 | Notifications | In-app and reusable HTML/text SMTP email updates for submission, assignment, resolution, rejection, and volunteer assignment; Socket.IO sends live in-app updates. |
 | Real-time updates | Socket.IO with JWT authentication, user/role rooms, authorized complaint subscriptions, and complaint/dashboard update events. |

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/client.js';
 import { checkComplaintDuplicates, getComplaint, submitComplaintFeedback, supportDuplicateComplaint, updateComplaintStatus } from '../api/complaints.js';
+import { reviewCompletionVerification } from '../api/assignments.js';
 import { statusLabel } from '../components/complaints/ComplaintCard.jsx';
 import ImageGallery from '../components/media/ImageGallery.jsx';
 import CompletionVerificationStatus from '../components/dashboard/CompletionVerificationStatus.jsx';
@@ -32,6 +33,7 @@ export default function ComplaintDetailsPage() {
   const [loadError, setLoadError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isReviewingCompletion, setIsReviewingCompletion] = useState(false);
   const [isSupporting, setIsSupporting] = useState(false);
   const [feedbackRating, setFeedbackRating] = useState(0);
   const [feedbackComment, setFeedbackComment] = useState('');
@@ -156,6 +158,19 @@ export default function ComplaintDetailsPage() {
     } finally { setIsSubmittingFeedback(false); }
   }
 
+  async function handleCompletionReview(decision) {
+    setIsReviewingCompletion(true);
+    setError('');
+    try {
+      await reviewCompletionVerification(id, decision);
+      await loadComplaint();
+    } catch (requestError) {
+      setError(getApiErrorMessage(requestError, 'Completion evidence review could not be saved.'));
+    } finally {
+      setIsReviewingCompletion(false);
+    }
+  }
+
   if (isLoading) return <div className="loading-state">Loading complaint...</div>;
   if (!complaint) return <section className="complaint-load-error" role="alert"><h1>Unable to load complaint details.</h1><p>{loadError || 'The complaint may be unavailable or you may not have access to it.'}</p><div><button type="button" className="primary-button compact-button" onClick={() => void loadComplaint()}>Retry</button><button type="button" className="outline-button" onClick={() => navigate('/dashboard/complaints', { replace: true })}>Back to complaints</button></div></section>;
 
@@ -164,6 +179,9 @@ export default function ComplaintDetailsPage() {
     && String(complaint.createdBy?._id || complaint.createdBy) === String(user?._id)
     && ['resolved', 'closed'].includes(complaint.status)
     && (complaint.assignedVolunteer || complaint.assignedTo);
+  const canReviewCompletion = user?.role === 'admin'
+    && complaint.status === 'needs_review'
+    && complaint.completionVerification?.verificationStatus === 'needs_review';
   const statusOptions = [complaint.status, ...availableTransitions.filter((nextStatus) => nextStatus !== complaint.status)];
 
   return (
@@ -211,6 +229,7 @@ export default function ComplaintDetailsPage() {
         })}</div> : <div className="empty-state compact-empty"><strong>No similar nearby reports found</strong><p>This report will remain visible with its own location marker.</p></div>}
       </section>
       {(complaint.beforeImages?.length > 0 || complaint.afterImages?.length > 0) && <section className="panel evidence-comparison"><div className="panel-heading"><div><p className="eyebrow">Field evidence</p><h2>Before and after</h2></div></div><div className="evidence-comparison-grid"><div><h3>Work started</h3><ImageGallery images={complaint.beforeImages} label="Before resolution images" /></div><div><h3>Work completed</h3><ImageGallery images={complaint.afterImages} label="After resolution images" /></div></div></section>}
+      {canReviewCompletion && <section className="panel completion-manual-review"><div><p className="eyebrow">Admin review</p><h2>Completion evidence needs review</h2><p className="page-lede">Automated visual comparison is disabled. Review the work-start and completion photos before deciding.</p></div><div className="completion-manual-review-actions"><button type="button" className="primary-button compact-button" disabled={isReviewingCompletion} onClick={() => void handleCompletionReview('approve')}>{isReviewingCompletion ? 'Saving…' : 'Approve and resolve'}</button><button type="button" className="outline-button" disabled={isReviewingCompletion} onClick={() => void handleCompletionReview('reject')}>Reject evidence</button></div></section>}
       {canLeaveFeedback && <section className="panel citizen-feedback-panel"><div className="panel-heading"><div><p className="eyebrow">How did it go?</p><h2>Rate your volunteer</h2></div></div>{complaint.myFeedback ? <div className="feedback-confirmation"><div className="feedback-stars" aria-label={`${validRating(complaint.myFeedback.rating)} out of 5 stars`}>{'★'.repeat(validRating(complaint.myFeedback.rating))}<span>{'★'.repeat(5 - validRating(complaint.myFeedback.rating))}</span></div><p>Your feedback has been recorded. Thank you for helping improve community service.</p>{complaint.myFeedback.comment && <blockquote>{complaint.myFeedback.comment}</blockquote>}</div> : <form onSubmit={handleFeedbackSubmit}><div className="feedback-star-picker" role="group" aria-label="Rate your volunteer from one to five stars">{[1, 2, 3, 4, 5].map((rating) => <button key={rating} type="button" className={rating <= feedbackRating ? 'is-selected' : ''} aria-label={`${rating} star${rating === 1 ? '' : 's'}`} aria-pressed={feedbackRating === rating} onClick={() => setFeedbackRating(rating)}>★</button>)}</div><label>Optional feedback<textarea value={feedbackComment} onChange={(event) => setFeedbackComment(event.target.value)} maxLength={1000} rows={3} placeholder="Share a few words about your experience" /></label><div className="feedback-form-footer"><small>{feedbackComment.length}/1000</small><button className="primary-button compact-button" disabled={isSubmittingFeedback || feedbackRating === 0}>{isSubmittingFeedback ? 'Submitting...' : 'Submit feedback'}</button></div></form>}</section>}
       {canUpdate && availableTransitions.length > 0 && <form className="panel status-form" onSubmit={handleStatusUpdate}>
         <div><p className="eyebrow">Operations</p><h2>Update status</h2></div>

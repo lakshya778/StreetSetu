@@ -141,13 +141,15 @@ app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 12 * 1024 * 1024
 
 
-# Model ko startup pe load karo (gunicorn --preload ke saath master process mein),
-# request ke time pe nahi. Isse pehli request ko load wait nahi karna padega.
+# Load only the local classifier artifacts during worker startup. Gunicorn
+# --preload loads these once before forking its single worker.
+print("AI service started", flush=True)
 try:
     get_classifier()
-    print("Classifier loaded at startup", flush=True)
+    print("Model loaded successfully", flush=True)
 except Exception:
-    app.logger.exception("Classifier preload failed")
+    app.logger.exception("Model load failed")
+    raise
 
 
 @app.get("/health")
@@ -291,5 +293,5 @@ def completion_verification():
 if __name__ == "__main__":
     app.run(
         host="0.0.0.0",
-        port=int(os.environ.get("PORT", 10000))
+        port=int(os.environ.get("PORT", 5000))
     )

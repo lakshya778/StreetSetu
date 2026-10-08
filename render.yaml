@@ -34,3 +34,14 @@ services:
         sync: false
       - key: AI_SERVICE_TOKEN
         sync: false
+  - type: web
+    name: streetsetu-ai
+    runtime: python
+    rootDir: ai-service
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --workers 1 --threads 2 --preload --bind 0.0.0.0:$PORT app:app
+    healthCheckPath: /health
+    autoDeploy: false
+    envVars:
+      - key: AI_SERVICE_TOKEN
+        sync: false
