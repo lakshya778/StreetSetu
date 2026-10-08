@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateListComplaints, validateStatusUpdate } from './complaintValidator.js';
+import { validateCreateComplaint, validateListComplaints, validateStatusUpdate } from './complaintValidator.js';
 
 function validate(payload) {
   const req = { body: payload };
@@ -47,4 +47,38 @@ test('complaint list rejects non-string search query values', () => {
   validateListComplaints(req, {}, (error) => { validationError = error; });
   assert.equal(validationError?.statusCode, 400);
   assert.ok(validationError.details.some((detail) => detail.field === 'search'));
+});
+
+test('complaint creation defaults anonymous reporting off and accepts an explicit opt-in', () => {
+  const req = { body: {
+    title: 'Overflowing bin near market',
+    description: 'The public waste bin has been overflowing since yesterday.',
+    category: 'waste_management',
+    latitude: 28.6,
+    longitude: 77.2
+  } };
+  let validationError;
+  validateCreateComplaint(req, {}, (error) => { validationError = error; });
+  assert.equal(validationError, undefined);
+  assert.equal(req.body.isAnonymous, false);
+
+  req.body.isAnonymous = true;
+  validateCreateComplaint(req, {}, (error) => { validationError = error; });
+  assert.equal(validationError, undefined);
+  assert.equal(req.body.isAnonymous, true);
+});
+
+test('complaint creation rejects non-boolean anonymous reporting values', () => {
+  const req = { body: {
+    title: 'Overflowing bin near market',
+    description: 'The public waste bin has been overflowing since yesterday.',
+    category: 'waste_management',
+    latitude: 28.6,
+    longitude: 77.2,
+    isAnonymous: 'true'
+  } };
+  let validationError;
+  validateCreateComplaint(req, {}, (error) => { validationError = error; });
+  assert.equal(validationError?.statusCode, 400);
+  assert.ok(validationError.details.some((detail) => detail.field === 'isAnonymous'));
 });

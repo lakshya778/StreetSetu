@@ -59,7 +59,7 @@ export async function getPublicComplaintTracking(id) {
     throw error;
   }
   const complaint = await Complaint.findById(id)
-    .select('title category status createdAt updatedAt resolvedAt assignedVolunteer assignedTo statusHistory')
+    .select('title category status isAnonymous createdAt updatedAt resolvedAt assignedVolunteer assignedTo statusHistory')
     .populate('assignedVolunteer', 'name')
     .populate('assignedTo', 'name')
     .lean();
@@ -78,6 +78,8 @@ export async function getPublicComplaintTracking(id) {
     title: complaint.title,
     category: complaint.category,
     status: complaint.status,
+    isAnonymous: complaint.isAnonymous,
+    reporter: { name: complaint.isAnonymous ? 'Anonymous' : 'Reporter' },
     createdAt: complaint.createdAt,
     updatedAt: complaint.updatedAt,
     resolvedAt: complaint.resolvedAt,

@@ -84,6 +84,9 @@ export function validateCreateComplaint(req, res, next) {
   if (body.priority !== undefined && !COMPLAINT_PRIORITIES.includes(body.priority)) {
     details.push({ field: 'priority', message: `Priority must be one of: ${COMPLAINT_PRIORITIES.join(', ')}` });
   }
+  if (body.isAnonymous !== undefined && typeof body.isAnonymous !== 'boolean') {
+    details.push({ field: 'isAnonymous', message: 'Anonymous reporting must be a boolean' });
+  }
   if (body.wardId !== undefined && (typeof body.wardId !== 'string' || !/^[a-f\d]{24}$/i.test(body.wardId))) {
     details.push({ field: 'wardId', message: 'Ward id must be a valid identifier' });
   }
@@ -101,6 +104,7 @@ export function validateCreateComplaint(req, res, next) {
     description,
     category: body.category,
     priority: body.priority || 'medium',
+    isAnonymous: body.isAnonymous === true,
     location: normalizedLocation.location,
     longitude: normalizedLocation.longitude,
     latitude: normalizedLocation.latitude,

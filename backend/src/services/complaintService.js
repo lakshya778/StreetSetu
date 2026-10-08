@@ -11,6 +11,7 @@ import { DUPLICATE_CONFIDENCE_THRESHOLD, findDuplicateCandidates } from './dupli
 import { emitToRole, emitToUser, publishComplaintUpdate } from './realtimeService.js';
 import { recordAudit } from './auditService.js';
 import { requireVerifiedCompletion } from './completionVerificationService.js';
+import { redactComplaintReporter } from './complaintPrivacy.js';
 import {
   notifyComplaintRejected,
   notifyComplaintImagesUploaded,
@@ -119,7 +120,7 @@ export async function createComplaint(payload, req) {
     }
   }
   publishComplaintUpdate(result, 'complaint:created');
-  return result;
+  return redactComplaintReporter(result, req);
 }
 
 export async function getComplaint(id, req) {
@@ -137,7 +138,7 @@ export async function getComplaint(id, req) {
     result.myFeedback = await Feedback.findOne({ complaint: complaint._id, citizen: req.user.sub })
       .select('rating comment createdAt updatedAt').lean();
   }
-  return result;
+  return redactComplaintReporter(result, req);
 }
 
 export async function submitComplaintFeedback(id, { rating, comment }, req) {
@@ -210,7 +211,10 @@ export async function listComplaints(query, req) {
   const countsByComplaint = new Map(voteCounts.map((item) => [String(item._id), item.count]));
   items.forEach((item) => { item.voteCount = countsByComplaint.get(String(item._id)) || 0; item.supporterCount = item.voteCount; });
 
-  return { items, page, limit, total, pages: Math.ceil(total / limit) };
+  return {
+    items: items.map((complaint) => redactComplaintReporter(complaint, req)),
+    page, limit, total, pages: Math.ceil(total / limit)
+  };
 }
 
 export async function verifyComplaint(id, req) {
@@ -241,7 +245,7 @@ export async function verifyComplaint(id, req) {
   } catch (error) {
     console.error('Complaint verification notification failed:', error.message);
   }
-  return complaint;
+  return redactComplaintReporter(complaint, req);
 }
 
 export async function checkComplaintDuplicates(payload) {
@@ -344,7 +348,8 @@ export async function listMapComplaints(query = {}, req) {
       .sort({ createdAt: -1 }).skip(hasPagination ? (page - 1) * limit : 0).limit(limit).lean(),
     hasPagination ? Complaint.countDocuments(filter) : Promise.resolve(null)
   ]);
-  return hasPagination ? { items, page, limit, total, pages: Math.ceil(total / limit) || 1 } : items;
+  const safeItems = items.map((complaint) => redactComplaintReporter(complaint, req));
+  return hasPagination ? { items: safeItems, page, limit, total, pages: Math.ceil(total / limit) || 1 } : safeItems;
 }
 
 export async function updateComplaintStatus(id, { status, note }, req) {
@@ -476,7 +481,7 @@ export async function updateComplaintStatus(id, { status, note }, req) {
     );
   }
 
-  return complaint;
+  return redactComplaintReporter(complaint, req);
 }
 export function listCategories() {
   return COMPLAINT_CATEGORIES;

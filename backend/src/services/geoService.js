@@ -1,5 +1,6 @@
 import Complaint, { COMPLAINT_CATEGORIES, COMPLAINT_PRIORITIES, COMPLAINT_STATUSES } from '../models/Complaint.js';
 import Vote from '../models/Vote.js';
+import { redactComplaintReporter } from './complaintPrivacy.js';
 
 export async function findNearbyComplaints({ latitude, longitude, radiusMeters, limit }, req) {
   const filter = {
@@ -24,7 +25,7 @@ export async function findNearbyComplaints({ latitude, longitude, radiusMeters, 
     .limit(limit);
 
   return {
-    items,
+    items: items.map((complaint) => redactComplaintReporter(complaint, req)),
     count: items.length,
     center: { latitude, longitude },
     radiusMeters

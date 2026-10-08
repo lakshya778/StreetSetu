@@ -82,6 +82,7 @@ const complaintSchema = new mongoose.Schema(
     category: { type: String, required: true, enum: COMPLAINT_CATEGORIES, index: true },
     priority: { type: String, enum: COMPLAINT_PRIORITIES, default: 'medium', index: true },
     status: { type: String, enum: COMPLAINT_STATUSES, default: 'submitted', index: true },
+    isAnonymous: { type: Boolean, default: false },
     location: {
       type: { type: String, enum: ['Point'], required: true },
       coordinates: {
