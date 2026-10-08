@@ -1,0 +1,32 @@
+[
+  {
+    "id": "wet",
+    "name": "Wet waste",
+    "binColor": "Green",
+    "examples": ["banana peel", "vegetable scraps", "food leftovers", "tea leaves", "eggshells"]
+  },
+  {
+    "id": "dry",
+    "name": "Dry waste",
+    "binColor": "Blue",
+    "examples": ["paper", "cardboard", "clean packaging", "newspaper", "empty cartons"]
+  },
+  {
+    "id": "recyclable",
+    "name": "Recyclable",
+    "binColor": "Blue",
+    "examples": ["plastic bottle", "glass bottle", "metal can", "clean hard plastic", "aluminium"]
+  },
+  {
+    "id": "hazardous",
+    "name": "Hazardous waste",
+    "binColor": "Red",
+    "examples": ["paint", "chemicals", "cleaning products", "broken thermometer", "pesticide container"]
+  },
+  {
+    "id": "e-waste",
+    "name": "E-waste",
+    "binColor": "Black",
+    "examples": ["mobile phone", "charger", "battery", "computer parts", "small appliances"]
+  }
+]

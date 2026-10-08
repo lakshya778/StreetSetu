@@ -1,0 +1,11 @@
+[
+  { "id": "delhi-1", "name": "North Delhi Recycling Drop-off", "lat": 28.7041, "lng": 77.1025, "accepts": ["Paper", "Plastic", "Metal"] },
+  { "id": "delhi-2", "name": "Central Delhi Materials Centre", "lat": 28.6448, "lng": 77.2167, "accepts": ["Paper", "Glass", "Plastic"] },
+  { "id": "delhi-3", "name": "South Delhi E-waste Collection Point", "lat": 28.5355, "lng": 77.2100, "accepts": ["E-waste", "Batteries"] },
+  { "id": "delhi-4", "name": "East Delhi Recycling Hub", "lat": 28.6280, "lng": 77.2950, "accepts": ["Plastic", "Metal", "Cardboard"] },
+  { "id": "delhi-5", "name": "West Delhi Community Collection Centre", "lat": 28.6517, "lng": 77.0860, "accepts": ["Paper", "Plastic", "Glass"] },
+  { "id": "delhi-6", "name": "Dwarka Recycling Point", "lat": 28.5921, "lng": 77.0460, "accepts": ["E-waste", "Plastic", "Metal"] },
+  { "id": "ncr-1", "name": "Noida Sector Materials Centre", "lat": 28.5355, "lng": 77.3910, "accepts": ["Paper", "Plastic", "Metal"] },
+  { "id": "ncr-2", "name": "Gurugram Community Recycling Point", "lat": 28.4595, "lng": 77.0266, "accepts": ["E-waste", "Batteries", "Small appliances"] },
+  { "id": "ncr-3", "name": "Ghaziabad Dry Waste Drop-off", "lat": 28.6692, "lng": 77.4538, "accepts": ["Cardboard", "Glass", "Plastic"] }
+]
