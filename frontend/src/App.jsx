@@ -16,6 +16,8 @@ const ComplaintManagementHomePage = lazy(() => import('./pages/ComplaintManageme
 const TransparencyPage = lazy(() => import('./pages/TransparencyPage.jsx'));
 const PublicComplaintTrackingPage = lazy(() => import('./pages/PublicComplaintTrackingPage.jsx'));
 const OverdueComplaintsPage = lazy(() => import('./pages/OverdueComplaintsPage.jsx'));
+const VolunteerDrivesPage = lazy(() => import('./pages/VolunteerDrivesPage.jsx'));
+const SegregationGuidePage = lazy(() => import('./pages/SegregationGuidePage.jsx'));
 
 export default function App() {
   return (
@@ -37,6 +39,8 @@ export default function App() {
               <Route path="/dashboard/complaints/:id" element={<ComplaintDetailsPage />} />
               <Route path="/dashboard/neighbourhoods" element={<WorkspacePage />} />
               <Route path="/dashboard/notifications" element={<NotificationPage />} />
+              <Route path="/dashboard/drives" element={<VolunteerDrivesPage />} />
+              <Route path="/dashboard/segregation-guide" element={<SegregationGuidePage />} />
             </Route>
           </Route>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />

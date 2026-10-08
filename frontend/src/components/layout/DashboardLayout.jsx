@@ -10,7 +10,9 @@ const baseNavigation = [
   { label: 'Complaints', path: '/dashboard/complaints', icon: 'complaints' },
   { label: 'My complaints', path: '/dashboard/my-complaints', icon: 'mine' },
   { label: 'Neighbourhoods', path: '/dashboard/neighbourhoods', icon: 'neighbourhoods' },
-  { label: 'Notifications', path: '/dashboard/notifications', icon: 'notifications' }
+  { label: 'Notifications', path: '/dashboard/notifications', icon: 'notifications' },
+  { label: 'Volunteer drives', path: '/dashboard/drives', icon: 'drives' },
+  { label: 'Segregation guide', path: '/dashboard/segregation-guide', icon: 'guide' }
 ];
 
 function NavigationIcon({ name }) {
@@ -20,6 +22,8 @@ function NavigationIcon({ name }) {
     mine: <><circle cx="12" cy="8" r="4" /><path d="M5 21v-2a7 7 0 0 1 14 0v2" /></>,
     neighbourhoods: <><path d="M3 21h18M5 21V8l7-5 7 5v13" /><path d="M9 21v-6h6v6" /></>,
     notifications: <><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M10 21h4" /></>,
+    drives: <><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" /><path d="m9 10 2 2 4-4" /></>,
+    guide: <><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z" /><path d="m9 12 2 2 4-4" /></>,
     logout: <><path d="M10 17l5-5-5-5M15 12H3" /><path d="M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6" /></>
   };
   return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{paths[name] || paths.overview}</svg>;

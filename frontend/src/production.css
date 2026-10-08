@@ -19,9 +19,52 @@
 .overdue-card-meta { align-items: center; margin-top: 16px; border-top: 1px solid var(--color-border); padding-top: 12px; color: var(--color-text-muted); font-size: 12px; }
 .overdue-card-meta strong { color: #b42318; }
 .overdue-empty, .overdue-message { color: var(--color-text-muted); }
+.drives-layout { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(280px, .9fr); align-items: start; gap: 24px; }
+.drives-list-section { min-width: 0; }
+.drives-list { display: grid; gap: 12px; }
+.drive-card { padding: 20px; }
+.drive-card-top, .drive-card-footer { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.drive-card h3 { margin: 0; color: var(--color-text); font: 500 22px/1.2 Georgia, serif; }
+.drive-card > p { margin: 14px 0; color: var(--color-text-muted); font-size: 14px; line-height: 1.6; }
+.drive-participants { flex: 0 0 auto; border-radius: 999px; padding: 7px 10px; color: var(--color-primary-dark); background: var(--color-primary-soft); font-size: 12px; font-weight: 700; }
+.drive-location { align-self: center; color: var(--color-text-muted); font-size: 13px; }
+.drive-create-form { display: grid; gap: 14px; padding: 22px; }
+.drive-create-form h2 { margin: -8px 0 2px; color: var(--color-text); font: 500 25px Georgia, serif; }
+.drive-create-form label, .segregation-search label { display: grid; gap: 7px; color: var(--color-text); font-size: 13px; font-weight: 650; }
+.drive-create-form input, .drive-create-form textarea, .segregation-search input { width: 100%; min-width: 0; min-height: 46px; border: 1px solid var(--color-border); border-radius: var(--radius-control); padding: 10px 12px; color: var(--color-text); background: var(--color-card); font-size: 16px; }
+.drive-create-form textarea { resize: vertical; }
+.drive-create-form input:focus, .drive-create-form textarea:focus, .segregation-search input:focus { outline: 3px solid rgb(20 83 45 / 16%); border-color: var(--color-primary); }
+.drive-create-form .form-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.drive-create-form .primary-button { min-height: 46px; border-radius: var(--radius-control); }
+.drive-empty { padding: 24px; color: var(--color-text-muted); }
+.drive-empty h3 { color: var(--color-text); }
+.segregation-search { display: grid; grid-template-columns: minmax(0, .45fr) minmax(240px, 1fr); align-items: center; gap: 14px; margin-bottom: 18px; padding: 16px; }
+.segregation-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.segregation-card { display: flex; align-items: flex-start; gap: 15px; min-width: 0; padding: 20px; }
+.segregation-card h2 { margin: 0 0 8px; color: var(--color-text); font: 500 21px Georgia, serif; }
+.segregation-card p:not(.eyebrow) { margin: 0; color: var(--color-text-muted); font-size: 13px; line-height: 1.6; }
+.segregation-card .eyebrow { margin: 0 0 5px; letter-spacing: .08em; }
+.segregation-bin { display: grid; place-items: center; flex: 0 0 42px; width: 42px; height: 48px; border-radius: 8px 8px 11px 11px; color: white; font-size: 19px; font-weight: 800; box-shadow: inset 0 -5px rgb(0 0 0 / 10%); }
+.bin-wet { background: #16823b; }
+.bin-dry, .bin-recyclable { background: #2563a6; }
+.bin-hazardous { background: #c83737; }
+.bin-e-waste { background: #39434b; }
+.guide-no-results { padding: 20px; color: var(--color-text-muted); }
+.recycling-centers-section { margin-top: 28px; }
+.recycling-centers-section .panel-heading p:not(.eyebrow) { margin: 0; color: var(--color-text-muted); font-size: 13px; }
+.recycling-map-shell, .recycling-map { width: 100%; height: 430px; border-radius: var(--radius-card); overflow: hidden; }
+.recycling-map-shell { border: 1px solid var(--color-border); box-shadow: var(--shadow-card); }
+.recycling-center-marker { border: 0; background: transparent; }
+.recycling-center-marker span { display: block; width: 18px; height: 18px; border: 3px solid #fff; border-radius: 50%; background: var(--color-primary); box-shadow: 0 2px 9px rgb(0 0 0 / 32%); }
 @media (max-width: 560px) {
   .overdue-card-heading, .overdue-card-meta { align-items: flex-start; flex-direction: column; }
+  .drive-card-top, .drive-card-footer { align-items: flex-start; flex-direction: column; }
+  .drive-create-form .form-row { grid-template-columns: 1fr; }
+  .segregation-search { grid-template-columns: 1fr; }
+  .segregation-grid { grid-template-columns: 1fr; }
+  .recycling-map-shell, .recycling-map { height: 350px; }
 }
+@media (max-width: 900px) { .drives-layout { grid-template-columns: minmax(0, 1fr); } }
 .public-page { min-height: 100vh; background: #f5f8f3; }
 .public-site-header { display: flex; justify-content: space-between; align-items: center; gap: 18px; min-height: 72px; padding: 12px max(22px,calc((100vw - 1180px)/2)); border-bottom: 1px solid #e4ebe3; background: #fff; }
 .public-brand { display: flex; align-items: center; gap: 10px; color: #29483e; text-decoration: none; }
