@@ -3,8 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
-import AuthBrandPanel from '../components/layout/AuthBrandPanel.jsx';
-import AuthSteps from '../components/layout/AuthSteps.jsx';
+import AuthPageLayout from '../components/layout/AuthPageLayout.jsx';
 
 export default function RegisterPage() {
   const { t } = useTranslation();
@@ -36,13 +35,11 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="auth-page auth-page-register">
-      <div className="auth-layout">
-        <AuthBrandPanel />
+    <AuthPageLayout>
         <section className="auth-panel">
           <div className="auth-form-wrap">
             <p className="eyebrow">{t('auth.getStarted')}</p>
-            <h1>{t('auth.registerTitle')}</h1>
+            <h2>{t('auth.registerTitle')}</h2>
             <p className="auth-subtitle">{t('auth.registerSubtitle')}</p>
             <form onSubmit={handleSubmit} className="auth-form">
               <label>{t('auth.fullName')}<input name="name" type="text" autoComplete="name" value={form.name} onChange={updateField} placeholder={t('auth.namePlaceholder')} required minLength="2" /></label>
@@ -68,8 +65,6 @@ export default function RegisterPage() {
             <p className="auth-switch">{t('auth.alreadyHaveAccount')} <Link to="/login">{t('nav.signIn')}</Link> · <Link to="/transparency">{t('auth.cityTransparency')}</Link></p>
           </div>
         </section>
-      </div>
-      <AuthSteps />
-    </main>
+    </AuthPageLayout>
   );
 }

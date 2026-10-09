@@ -3,8 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
-import AuthBrandPanel from '../components/layout/AuthBrandPanel.jsx';
-import AuthSteps from '../components/layout/AuthSteps.jsx';
+import AuthPageLayout from '../components/layout/AuthPageLayout.jsx';
 
 export default function LoginPage() {
   const { t } = useTranslation();
@@ -37,13 +36,11 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="auth-page">
-      <div className="auth-layout">
-        <AuthBrandPanel />
+    <AuthPageLayout>
         <section className="auth-panel">
           <div className="auth-form-wrap">
             <p className="eyebrow">{t('auth.welcomeBack')}</p>
-            <h1>{t('auth.signInTitle')}</h1>
+            <h2>{t('auth.signInTitle')}</h2>
             <p className="auth-subtitle">{t('auth.signInSubtitle')}</p>
             <form onSubmit={handleSubmit} className="auth-form">
               <label>{t('auth.email')}<input name="email" type="email" autoComplete="email" value={form.email} onChange={updateField} placeholder={t('auth.emailPlaceholder')} required /></label>
@@ -54,8 +51,6 @@ export default function LoginPage() {
             <p className="auth-switch">{t('auth.newHere')} <Link to="/register">{t('auth.createAccount')}</Link> · <Link to="/transparency">{t('auth.cityTransparency')}</Link></p>
           </div>
         </section>
-      </div>
-      <AuthSteps />
-    </main>
+    </AuthPageLayout>
   );
 }
