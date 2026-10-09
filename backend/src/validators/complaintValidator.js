@@ -47,9 +47,8 @@ function validateLocation(body, details) {
 }
 
 function validateAttachments(attachments, details) {
-  if (attachments === undefined) return;
-  if (!Array.isArray(attachments) || attachments.length > 5) {
-    details.push({ field: 'attachments', message: 'Attachments must be an array with at most 5 items' });
+  if (!Array.isArray(attachments) || attachments.length < 1 || attachments.length > 5) {
+    details.push({ field: 'attachments', message: 'Between 1 and 5 live camera photos are required' });
     return;
   }
 
@@ -63,10 +62,37 @@ function validateAttachments(attachments, details) {
     if (attachment?.size !== undefined && (!Number.isInteger(attachment.size) || attachment.size < 0 || attachment.size > 5 * 1024 * 1024)) {
       details.push({ field: `attachments.${index}.size`, message: 'Attachment size must be between 0 and 5 MB' });
     }
+    if (!['live_camera', 'dev_gallery'].includes(attachment?.captureSource)
+      || attachment?.imageMetadata?.captureSource !== attachment?.captureSource) {
+      details.push({ field: `attachments.${index}.captureSource`, message: 'Live camera capture required' });
+    }
+    if (!/^[a-f\d]{64}$/i.test(attachment?.proofHash || '')) {
+      details.push({ field: `attachments.${index}.proofHash`, message: 'A valid server evidence hash is required' });
+    }
+    if (attachment?.captureSource === 'dev_gallery'
+      && (process.env.ALLOW_DEV_GALLERY_PROOF !== 'true' || process.env.NODE_ENV === 'production')) {
+      details.push({ field: `attachments.${index}.captureSource`, message: 'Live camera capture required' });
+    }
+    if (attachment?.captureSource === 'live_camera') {
+      const metadata = attachment.imageMetadata || {};
+      const capturedAt = new Date(metadata.capturedAt);
+      if (!Number.isFinite(metadata.latitude) || metadata.latitude < -90 || metadata.latitude > 90
+        || !Number.isFinite(metadata.longitude) || metadata.longitude < -180 || metadata.longitude > 180
+        || !Number.isFinite(metadata.accuracy) || metadata.accuracy < 0
+        || typeof metadata.capturedAt !== 'string'
+        || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(metadata.capturedAt)
+        || Number.isNaN(capturedAt.getTime())) {
+        details.push({ field: `attachments.${index}.imageMetadata`, message: 'Valid live camera metadata is required' });
+      }
+    }
+    if (attachment?.evidenceFlag !== undefined
+      && !['location_mismatch', 'time_mismatch'].includes(attachment.evidenceFlag)) {
+      details.push({ field: `attachments.${index}.evidenceFlag`, message: 'Evidence review flag is invalid' });
+    }
   });
 }
 
-export function validateCreateComplaint(req, res, next) {
+function validateComplaintPayload(req, res, next, requireEvidence) {
   const body = req.body || {};
   const details = [];
   const title = typeof body.title === 'string' ? body.title.trim() : '';
@@ -96,7 +122,7 @@ export function validateCreateComplaint(req, res, next) {
     }
   }
   const normalizedLocation = validateLocation(body, details);
-  validateAttachments(body.attachments, details);
+  if (requireEvidence) validateAttachments(body.attachments, details);
 
   if (details.length > 0) return next(validationError(details));
   req.body = {
@@ -116,6 +142,14 @@ export function validateCreateComplaint(req, res, next) {
     allowDuplicate: body.allowDuplicate === true
   };
   return next();
+}
+
+export function validateCreateComplaint(req, res, next) {
+  return validateComplaintPayload(req, res, next, true);
+}
+
+export function validateDuplicateCheck(req, res, next) {
+  return validateComplaintPayload(req, res, next, false);
 }
 
 export function validateStatusUpdate(req, res, next) {

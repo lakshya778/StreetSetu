@@ -2,12 +2,12 @@ import { Router } from 'express';
 import { authenticate } from '../middleware/auth.js';
 import { uploadImages } from '../middleware/upload.js';
 import { uploadImages as uploadImagesController, uploadWorkEvidence } from '../controllers/uploadController.js';
-import { validateImageUpload } from '../validators/uploadValidator.js';
+import { validateComplaintImageUpload, validateImageUpload } from '../validators/uploadValidator.js';
 
 const router = Router();
 
 router.use(authenticate);
-router.post('/images', uploadImages, validateImageUpload, uploadImagesController);
+router.post('/images', uploadImages, validateImageUpload, validateComplaintImageUpload, uploadImagesController);
 router.post('/complaints/:complaintId/before-images', uploadImages, validateImageUpload, (req, res, next) => {
   req.params.stage = 'before';
   return uploadWorkEvidence(req, res, next);

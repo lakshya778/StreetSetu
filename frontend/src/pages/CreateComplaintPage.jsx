@@ -1,23 +1,34 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/client.js';
 import { checkComplaintDuplicates, classifyComplaint, complaintCategories, createComplaint, complaintPriorities, supportDuplicateComplaint, uploadComplaintImages } from '../api/complaints.js';
-import ImageUploader from '../components/media/ImageUploader.jsx';
+import LiveCameraCapture from '../components/media/LiveCameraCapture.jsx';
+import DevGalleryProof from '../components/media/DevGalleryProof.jsx';
 import DuplicateWarningModal from '../components/complaints/DuplicateWarningModal.jsx';
 import LocationPicker from '../components/maps/LocationPicker.jsx';
 import PageHeader from '../components/layout/PageHeader.jsx';
 import NearbyComplaintsPanel from '../components/complaints/NearbyComplaintsPanel.jsx';
+import { reverseGeocode } from '../api/locations.js';
 import reportTips from '../data/reportTips.json';
 
 const initialForm = { title: '', description: '', category: 'roads', priority: 'medium', isAnonymous: false, latitude: '', longitude: '', address: '', city: '', area: '' };
 let nextEducationalTip = 0;
 
+function distanceMeters(latitudeA, longitudeA, latitudeB, longitudeB) {
+  const radians = (degrees) => degrees * Math.PI / 180;
+  const latitudeDelta = radians(latitudeB - latitudeA);
+  const longitudeDelta = radians(longitudeB - longitudeA);
+  const value = Math.sin(latitudeDelta / 2) ** 2
+    + Math.cos(radians(latitudeA)) * Math.cos(radians(latitudeB)) * Math.sin(longitudeDelta / 2) ** 2;
+  return 6371000 * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(Math.max(0, 1 - value)));
+}
+
 export default function CreateComplaintPage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [form, setForm] = useState(initialForm);
-  const [files, setFiles] = useState([]);
+  const [photos, setPhotos] = useState([]);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null);
@@ -27,16 +38,93 @@ export default function CreateComplaintPage() {
   const [showEducationalTip, setShowEducationalTip] = useState(false);
   const [duplicateCandidate, setDuplicateCandidate] = useState(null);
   const [duplicateSupported, setDuplicateSupported] = useState(false);
+  const [cameraCaptureKey, setCameraCaptureKey] = useState(0);
+  const [galleryCaptureKey, setGalleryCaptureKey] = useState(0);
+  const [locationMismatchConfirmed, setLocationMismatchConfirmed] = useState(false);
+  const locationSelectionRef = useRef(0);
+  const photoPreviews = useMemo(() => photos.map((photo) => ({
+    ...photo,
+    previewUrl: URL.createObjectURL(photo.file)
+  })), [photos]);
+
+  useEffect(() => () => photoPreviews.forEach((photo) => URL.revokeObjectURL(photo.previewUrl)), [photoPreviews]);
 
   function updateField(event) { setForm((current) => ({ ...current, [event.target.name]: event.target.value })); }
 
   function updateLocation({ latitude, longitude, address, city = '', area = '' }) {
+    locationSelectionRef.current += 1;
+    setLocationMismatchConfirmed(false);
     setForm((current) => ({ ...current, latitude: latitude.toFixed(6), longitude: longitude.toFixed(6), address, city, area }));
   }
+
+  async function selectFirstPhotoLocation(metadata) {
+    const requestId = ++locationSelectionRef.current;
+    setLocationMismatchConfirmed(false);
+    const coordinates = {
+      latitude: metadata.latitude,
+      longitude: metadata.longitude
+    };
+    setForm((current) => ({
+      ...current,
+      latitude: coordinates.latitude.toFixed(6),
+      longitude: coordinates.longitude.toFixed(6),
+      address: '',
+      city: '',
+      area: ''
+    }));
+    try {
+      const address = await reverseGeocode(coordinates.latitude, coordinates.longitude);
+      if (locationSelectionRef.current === requestId) {
+        setForm((current) => ({ ...current, address, city: '', area: '' }));
+      }
+    } catch {
+      if (locationSelectionRef.current === requestId) setError(t('report.photoLocationAddressError'));
+    }
+  }
+
+  function addPhoto(file, metadata) {
+    if (photos.length >= 5) return;
+    const nextPhoto = { file, metadata };
+    setPhotos((current) => current.length < 5 ? [...current, nextPhoto] : current);
+    setError('');
+    setLocationMismatchConfirmed(false);
+    if (!photos.some((photo) => photo.metadata.captureSource === 'live_camera')
+      && metadata.captureSource === 'live_camera') {
+      void selectFirstPhotoLocation(metadata);
+    }
+    setCameraCaptureKey((current) => current + 1);
+    setGalleryCaptureKey((current) => current + 1);
+  }
+
+  function removePhoto(index) {
+    setPhotos((current) => current.filter((_, photoIndex) => photoIndex !== index));
+    setError('');
+    setLocationMismatchConfirmed(false);
+  }
+
+  const hasPhotoLocationMismatch = photos.some((photo) => (
+    photo.metadata.captureSource === 'live_camera'
+    && form.latitude !== ''
+    && form.longitude !== ''
+    && distanceMeters(
+      Number(form.latitude),
+      Number(form.longitude),
+      photo.metadata.latitude,
+      photo.metadata.longitude
+    ) > 200
+  ));
 
   async function handleSubmit(event) {
     event.preventDefault();
     setError('');
+    if (photos.length < 1) {
+      setError(t('report.photoRequired'));
+      return;
+    }
+    if (hasPhotoLocationMismatch && !locationMismatchConfirmed) {
+      setError(t('report.locationMismatchConfirm'));
+      return;
+    }
     const latitude = Number(form.latitude);
     const longitude = Number(form.longitude);
     if (!form.latitude || !form.longitude || !Number.isFinite(latitude) || !Number.isFinite(longitude)
@@ -61,7 +149,7 @@ export default function CreateComplaintPage() {
     setIsSubmitting(true);
     setError('');
     try {
-      const attachments = files.length ? await uploadComplaintImages(files, setUploadProgress) : [];
+      const attachments = await uploadComplaintImages(photos, { latitude, longitude }, setUploadProgress);
       const complaint = await createComplaint({ ...form, latitude, longitude, attachments, allowDuplicate });
       setCreatedComplaint(complaint);
       setTipIndex(nextEducationalTip % reportTips.en.length);
@@ -107,7 +195,39 @@ export default function CreateComplaintPage() {
     <form className="complaint-form panel" onSubmit={handleSubmit}>
       <div className="form-section"><p className="form-section-title">{t('report.issue')}</p><label>{t('report.titleLabel')}<input name="title" value={form.title} onChange={updateField} placeholder={t('report.titlePlaceholder')} required minLength="5" maxLength="160" /></label><label>{t('report.description')}<textarea name="description" value={form.description} onChange={updateField} placeholder={t('report.descriptionPlaceholder')} required minLength="10" maxLength="5000" rows="5" /></label><div className="form-row"><label>{t('report.category')}<select name="category" value={form.category} onChange={updateField}>{complaintCategories.map((category) => <option key={category} value={category}>{t(`category.${category}`)}</option>)}</select></label><label>{t('report.priority')}<select name="priority" value={form.priority} onChange={updateField}>{complaintPriorities.map((priority) => <option key={priority} value={priority}>{t(`priority.${priority}`)}</option>)}</select></label></div><label className="anonymous-report-toggle"><input type="checkbox" name="isAnonymous" checked={form.isAnonymous} onChange={(event) => setForm((current) => ({ ...current, isAnonymous: event.target.checked }))} /><span><strong>{t('report.reportAnonymously')}</strong><small>{t('report.anonymousHelp')}</small></span></label></div>
       <div className="form-section"><div className="form-section-heading"><p className="form-section-title">{t('report.location')}</p><span>{form.latitude && form.longitude && form.address ? t('report.locationSelected') : t('report.required')}</span></div><LocationPicker latitude={form.latitude} longitude={form.longitude} address={form.address} onChange={updateLocation} disabled={isSubmitting || Boolean(createdComplaint)} /><NearbyComplaintsPanel latitude={form.latitude} longitude={form.longitude} /></div>
-      <div className="form-section"><p className="form-section-title">{t('report.evidence')}</p><ImageUploader files={files} onChange={setFiles} disabled={isSubmitting || Boolean(createdComplaint)} label={t('report.addPhotos')} /></div>
+      <div className="form-section">
+        <p className="form-section-title">{t('report.evidence')}</p>
+        <p className="capture-photo-count">{t('report.photoCount', { count: photos.length })}</p>
+        {photoPreviews.length > 0 && <div className="captured-report-photos">
+          {photoPreviews.map((photo, index) => <figure className="captured-report-photo" key={`${photo.file.name}-${index}`}>
+            <img src={photo.previewUrl} alt={t('report.photoPreviewAlt', { number: index + 1 })} width="400" height="300" />
+            <figcaption>
+              <span>{photo.metadata.captureSource === 'live_camera' ? t('report.liveCaptureBadge') : t('report.devGalleryBadge')}</span>
+              {photo.metadata.capturedAt && <small>{t('report.photoTakenAt', { time: new Date(photo.metadata.capturedAt).toLocaleString(i18n.resolvedLanguage === 'hi' ? 'hi-IN' : 'en-IN') })}</small>}
+              <button type="button" className="outline-button" disabled={isSubmitting || Boolean(createdComplaint)} onClick={() => removePhoto(index)}>{t('report.removePhoto')}</button>
+            </figcaption>
+          </figure>)}
+        </div>}
+        {photos.length < 5 && <LiveCameraCapture
+          key={cameraCaptureKey}
+          disabled={isSubmitting || Boolean(createdComplaint)}
+          captureLabel={t('report.takePhoto')}
+          submitLabel={t('report.usePhoto')}
+          onSubmit={addPhoto}
+        />}
+        {photos.length < 5 && <DevGalleryProof
+          key={galleryCaptureKey}
+          disabled={isSubmitting || Boolean(createdComplaint)}
+          chooseLabel={t('report.devGalleryChoose')}
+          submitLabel={t('report.devGalleryAdd')}
+          bannerLabel={t('report.devGalleryBanner')}
+          onSubmit={addPhoto}
+        />}
+        {hasPhotoLocationMismatch && <div className="evidence-location-warning" role="alert">
+          <p>{t('report.photoLocationMismatch')}</p>
+          <label><input type="checkbox" checked={locationMismatchConfirmed} onChange={(event) => setLocationMismatchConfirmed(event.target.checked)} />{t('report.confirmPhotoLocation')}</label>
+        </div>}
+      </div>
       {error && <div className="form-error" role="alert">{error}</div>}
       {uploadProgress !== null && <div className="upload-progress" role="status"><progress max="100" value={uploadProgress} /><span>{t('report.uploadingPhotos', { percent: uploadProgress })}</span></div>}
       <div className="form-actions"><Link className="outline-button" to="/dashboard/complaints">{t('report.cancel')}</Link><button className="primary-button compact-button" type="submit" disabled={isSubmitting || createdComplaint}>{isSubmitting ? t('report.submitting') : createdComplaint ? t('report.submitted') : t('report.submit')} <span>→</span></button></div>

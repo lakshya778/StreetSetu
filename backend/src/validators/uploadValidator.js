@@ -1,3 +1,5 @@
+import { validateComplaintEvidenceUpload } from '../services/complaintEvidence.js';
+
 function validationError(details) {
   const error = new Error('The upload request is invalid');
   error.statusCode = 400;
@@ -22,4 +24,18 @@ export function validateImageUpload(req, res, next) {
 
   if (invalidFiles.length > 0) return next(validationError(invalidFiles));
   return next();
+}
+
+export function validateComplaintImageUpload(req, res, next) {
+  try {
+    req.complaintEvidenceMetadata = validateComplaintEvidenceUpload({
+      files: req.files,
+      captureMetadata: req.body?.captureMetadata,
+      latitude: req.body?.latitude,
+      longitude: req.body?.longitude
+    });
+    return next();
+  } catch (error) {
+    return next(error);
+  }
 }

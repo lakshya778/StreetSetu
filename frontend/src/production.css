@@ -99,6 +99,21 @@
 .image-gallery-item { position: relative; min-width: 0; margin: 0; }
 .image-gallery .image-gallery-remove { z-index: 2; }
 .image-gallery-trigger:focus-visible, .feedback-star-picker button:focus-visible { outline: 3px solid #83a978; outline-offset: 2px; }
+.capture-photo-count { margin: -5px 0 12px; color: #71857a; font-size: 12px; }
+.captured-report-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.captured-report-photo { min-width: 0; overflow: hidden; margin: 0; border: 1px solid #dce5dd; border-radius: 10px; background: #fff; }
+.captured-report-photo img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #edf1ed; }
+.captured-report-photo figcaption { display: grid; gap: 7px; padding: 9px; color: #496356; font-size: 11px; }
+.captured-report-photo figcaption small { overflow-wrap: anywhere; color: #71857a; }
+.captured-report-photo figcaption .outline-button { justify-self: start; min-height: 34px; padding: 6px 10px; }
+.evidence-location-warning { display: grid; gap: 9px; margin-top: 12px; border: 1px solid #e8c88a; border-radius: 9px; padding: 12px; color: #704e13; background: #fff8e8; }
+.evidence-location-warning p { margin: 0; font-weight: 700; }
+.evidence-location-warning label { display: flex; align-items: flex-start; gap: 8px; }
+.evidence-location-warning input { margin-top: 2px; }
+.complaint-evidence-trust { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 9px; color: #536f5f; font-size: 11px; }
+.complaint-evidence-trust small { overflow-wrap: anywhere; color: #71857a; }
+.evidence-trust-badge, .evidence-review-chip { display: inline-flex; align-items: center; width: fit-content; border-radius: 999px; padding: 4px 9px; color: #315a3d; background: #e8f2e4; font-size: 10px; font-weight: 750; }
+.evidence-review-chip { color: #754d0b; background: #fff0cd; }
 .image-viewer-backdrop { position: fixed; z-index: 2000; inset: 0; display: grid; place-items: center; padding: 18px; background: rgb(18 29 24 / 88%); }
 .image-viewer-modal { display: grid; grid-template-rows: auto minmax(0,1fr) auto; width: min(1100px,100%); height: min(90dvh,850px); overflow: hidden; border: 1px solid rgb(255 255 255 / 15%); border-radius: 12px; background: #1e2b25; box-shadow: 0 24px 80px rgb(0 0 0 / 35%); }
 .image-viewer-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 11px 14px; color: #f5f8f3; }

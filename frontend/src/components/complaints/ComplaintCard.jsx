@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import i18n from '../../i18n/index.js';
+import { useAuth } from '../../context/AuthContext.jsx';
 
 const statusLabels = {
   submitted: 'Submitted', under_review: 'Under review', assigned: 'Assigned',
@@ -36,7 +37,11 @@ function timeAgo(value, locale) {
 
 export default function ComplaintCard({ complaint }) {
   const { t, i18n } = useTranslation();
-  const thumbnail = thumbnailUrl(complaint.attachments?.[0]);
+  const { user } = useAuth();
+  const livePhoto = complaint.attachments?.find((image) => (
+    image.captureSource === 'live_camera' || image.imageMetadata?.captureSource === 'live_camera'
+  ));
+  const thumbnail = thumbnailUrl(livePhoto || complaint.attachments?.[0]);
   const locale = i18n.resolvedLanguage === 'hi' ? 'hi-IN' : 'en-IN';
   return (
     <Link to={`/dashboard/complaints/${complaint._id}`} className="complaint-card">
@@ -53,6 +58,11 @@ export default function ComplaintCard({ complaint }) {
         <span>{t(`category.${complaint.category}`, { defaultValue: complaint.category?.replaceAll('_', ' ') })}</span>
         <span>{timeAgo(complaint.createdAt, locale)}</span>
       </div>
+      {livePhoto && <div className="complaint-evidence-trust">
+        <span className="evidence-trust-badge">{t('report.liveCaptureBadge')}</span>
+        {livePhoto.imageMetadata?.capturedAt && <small>{t('report.photoTakenAt', { time: new Date(livePhoto.imageMetadata.capturedAt).toLocaleString(locale) })}</small>}
+      </div>}
+      {user?.role === 'admin' && complaint.evidenceFlag && <span className="evidence-review-chip">{t('report.needsLocationReview')}</span>}
       <div className="complaint-card-support"><span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8Z" /></svg>{complaint.supporterCount ?? complaint.voteCount ?? 0} {t('complaints.supporting')}</span><span>{t('complaints.viewReport')} <b aria-hidden="true">→</b></span></div>
     </Link>
   );

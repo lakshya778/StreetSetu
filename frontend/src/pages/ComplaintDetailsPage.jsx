@@ -25,7 +25,7 @@ const ADMIN_TRANSITIONS = {
 };
 
 export default function ComplaintDetailsPage() {
-  useTranslation();
+  const { t, i18n } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -181,6 +181,7 @@ export default function ComplaintDetailsPage() {
 
   const history = Array.isArray(complaint.statusHistory) ? complaint.statusHistory.filter(Boolean) : [];
   const latestProof = history.slice().reverse().find((event) => event.captureSource);
+  const locale = i18n.resolvedLanguage === 'hi' ? 'hi-IN' : 'en-IN';
   const canLeaveFeedback = user?.role === 'citizen'
     && String(complaint.createdBy?._id || complaint.createdBy) === String(user?._id)
     && ['resolved', 'closed'].includes(complaint.status)
@@ -198,13 +199,20 @@ export default function ComplaintDetailsPage() {
       {error && <div className="notice-banner" role="alert">{error}</div>}
       <div className="details-grid">
         <section className="panel detail-main">
-          <div className="detail-tags"><span className={`priority-label priority-${complaint.priority || 'medium'}`}>{complaint.priority || 'Normal'} priority</span><span className="category-tag">{displayCategory(complaint.category)}</span></div>
+          <div className="detail-tags"><span className={`priority-label priority-${complaint.priority || 'medium'}`}>{complaint.priority || 'Normal'} priority</span><span className="category-tag">{displayCategory(complaint.category)}</span>{user?.role === 'admin' && complaint.evidenceFlag && <span className="evidence-review-chip">{t('report.needsLocationReview')}</span>}</div>
           <section className="ai-triage-card"><span className="ai-triage-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3 1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2L12 3Z" /><path d="m19 14 .9 2.1L22 17l-2.1.9L19 20l-.9-2.1L16 17l2.1-.9L19 14Z" /></svg></span><div><strong>AI-assisted triage</strong><p>Routing suggestions support the team; the report remains available for human review.</p></div></section>
           <div className="supporter-summary"><strong>{complaint.supporterCount ?? complaint.voteCount ?? 0}</strong> people support this complaint <button type="button" className="outline-button" onClick={handleSupport} disabled={isSupporting}>{isSupporting ? 'Adding support…' : 'Support this complaint'}</button></div>
           <p className="detail-description">{complaint.description}</p>
           {complaint.status === 'rejected' && <div className="rejection-reason-box"><strong>Rejection reason</strong><p>{complaint.rejectionReason || history.find((event) => event.status === 'rejected')?.note || 'No reason was recorded for this historical rejection.'}</p>{complaint.rejectedAt && <small>Rejected {new Date(complaint.rejectedAt).toLocaleString('en-IN')}</small>}</div>}
           {complaint.address && <div className="location-block"><span>⌖</span><div><strong>{complaint.address}</strong><small>{complaint.latitude}, {complaint.longitude}</small></div></div>}
-          {Array.isArray(complaint.attachments) && complaint.attachments.length > 0 && <div className="complaint-evidence"><h2>Reported photos</h2><ImageGallery images={complaint.attachments} label="Reported complaint images" /></div>}
+          {Array.isArray(complaint.attachments) && complaint.attachments.length > 0 && <div className="complaint-evidence">
+            <h2>Reported photos</h2>
+            <ImageGallery images={complaint.attachments} label="Reported complaint images" />
+            {complaint.attachments.filter((image) => image.captureSource === 'live_camera' || image.imageMetadata?.captureSource === 'live_camera').map((image, index) => <div className="complaint-evidence-trust" key={image.proofHash || image.url || index}>
+              <span className="evidence-trust-badge">{t('report.liveCaptureBadge')}</span>
+              {image.imageMetadata?.capturedAt && <small>{t('report.photoTakenAt', { time: new Date(image.imageMetadata.capturedAt).toLocaleString(locale) })}</small>}
+            </div>)}
+          </div>}
           <CompletionVerificationStatus verification={complaint.completionVerification} />
           {latestProof && <div className="completion-proof-trust">
             <p>{latestProof.captureSource === 'live_camera'

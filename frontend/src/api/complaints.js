@@ -77,10 +77,13 @@ export async function classifyComplaint(id) {
   return data.data;
 }
 
-export async function uploadComplaintImages(files, onUploadProgress) {
-  const compressedFiles = await Promise.all(files.map(compressImageFile));
+export async function uploadComplaintImages(photos, location, onUploadProgress) {
+  const compressedFiles = await Promise.all(photos.map(({ file }) => compressImageFile(file)));
   const formData = new FormData();
   compressedFiles.forEach((file) => formData.append('images', file));
+  formData.append('latitude', String(location.latitude));
+  formData.append('longitude', String(location.longitude));
+  formData.append('captureMetadata', JSON.stringify(photos.map(({ metadata }) => metadata)));
   const { data } = await api.post('/uploads/images', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
     onUploadProgress: (event) => onUploadProgress?.(event.total ? Math.round((event.loaded / event.total) * 100) : 0)

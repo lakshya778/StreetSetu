@@ -5,6 +5,7 @@ import { categories, create, detail, duplicateCheck, duplicates, list, map, merg
 import { discoverNearby } from '../controllers/geoController.js';
 import {
 	validateCreateComplaint,
+	validateDuplicateCheck,
 	validateListComplaints,
 	validateStatusUpdate
 } from '../validators/complaintValidator.js';
@@ -18,7 +19,7 @@ router.use(authenticate);
 router.get('/categories', categories);
 router.get('/map', authorize('citizen', 'volunteer', 'admin'), validateListComplaints, map);
 router.get('/nearby', authorize('citizen', 'volunteer', 'admin'), validateNearbyComplaints, discoverNearby);
-router.post('/duplicates/check', authorize('citizen', 'volunteer', 'admin'), validateCreateComplaint, duplicateCheck);
+router.post('/duplicates/check', authorize('citizen', 'volunteer', 'admin'), validateDuplicateCheck, duplicateCheck);
 router.get('/duplicates', authorize('admin'), duplicates);
 router.post('/', authorize('citizen', 'volunteer', 'admin'), validateCreateComplaint, create);
 router.get('/', authorize('citizen', 'volunteer', 'admin'), validateListComplaints, list);

@@ -3,7 +3,11 @@ import { addWorkEvidence } from '../services/workEvidenceService.js';
 
 export async function uploadImages(req, res, next) {
   try {
-    const attachments = await uploadImagesToCloudinary(req.files, req.user.sub);
+    const uploaded = await uploadImagesToCloudinary(req.files, req.user.sub);
+    const attachments = uploaded.map((image, index) => ({
+      ...image,
+      ...req.complaintEvidenceMetadata[index]
+    }));
     return res.status(201).json({
       success: true,
       data: { attachments },

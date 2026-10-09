@@ -1,6 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateCreateComplaint, validateListComplaints, validateStatusUpdate } from './complaintValidator.js';
+import { validateCreateComplaint, validateDuplicateCheck, validateListComplaints, validateStatusUpdate } from './complaintValidator.js';
+
+const liveAttachment = {
+  url: 'https://images.example.test/report.jpg',
+  mimeType: 'image/jpeg',
+  size: 100,
+  captureSource: 'live_camera',
+  proofHash: 'a'.repeat(64),
+  imageMetadata: {
+    latitude: 28.6,
+    longitude: 77.2,
+    accuracy: 8,
+    capturedAt: new Date().toISOString(),
+    captureSource: 'live_camera'
+  }
+};
 
 function validate(payload) {
   const req = { body: payload };
@@ -55,7 +70,8 @@ test('complaint creation defaults anonymous reporting off and accepts an explici
     description: 'The public waste bin has been overflowing since yesterday.',
     category: 'waste_management',
     latitude: 28.6,
-    longitude: 77.2
+    longitude: 77.2,
+    attachments: [liveAttachment]
   } };
   let validationError;
   validateCreateComplaint(req, {}, (error) => { validationError = error; });
@@ -75,10 +91,40 @@ test('complaint creation rejects non-boolean anonymous reporting values', () => 
     category: 'waste_management',
     latitude: 28.6,
     longitude: 77.2,
+    attachments: [liveAttachment],
     isAnonymous: 'true'
   } };
   let validationError;
   validateCreateComplaint(req, {}, (error) => { validationError = error; });
   assert.equal(validationError?.statusCode, 400);
   assert.ok(validationError.details.some((detail) => detail.field === 'isAnonymous'));
+});
+
+test('complaint creation rejects an empty photo list', () => {
+  const req = { body: {
+    title: 'Overflowing bin near market',
+    description: 'The public waste bin has been overflowing since yesterday.',
+    category: 'waste_management',
+    latitude: 28.6,
+    longitude: 77.2,
+    attachments: []
+  } };
+  let validationError;
+  validateCreateComplaint(req, {}, (error) => { validationError = error; });
+  assert.equal(validationError?.statusCode, 400);
+  assert.ok(validationError.details.some((detail) => detail.field === 'attachments'));
+});
+
+test('duplicate checks remain valid without photo attachments', () => {
+  const req = { body: {
+    title: 'Overflowing bin near market',
+    description: 'The public waste bin has been overflowing since yesterday.',
+    category: 'waste_management',
+    latitude: 28.6,
+    longitude: 77.2
+  } };
+  let validationError;
+  validateDuplicateCheck(req, {}, (error) => { validationError = error; });
+  assert.equal(validationError, undefined);
+  assert.deepEqual(req.body.attachments, []);
 });

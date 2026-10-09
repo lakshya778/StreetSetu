@@ -37,7 +37,12 @@ function cameraErrorMessage(error) {
   return 'The camera could not be started. Check browser permissions and try again.';
 }
 
-export default function LiveCameraCapture({ disabled = false, onSubmit }) {
+export default function LiveCameraCapture({
+  disabled = false,
+  onSubmit,
+  captureLabel = 'Capture proof photo',
+  submitLabel = 'Submit completion photo'
+}) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
@@ -325,12 +330,12 @@ export default function LiveCameraCapture({ disabled = false, onSubmit }) {
     {(cameraState !== 'granted' || locationState !== 'granted') && guideDismissed && <button type="button" className="outline-button" onClick={() => setGuideDismissed(false)}>Permission help</button>}
     <div className="capture-actions">
       {!photo && <button type="button" className="assignment-action" disabled={disabled || !cameraReady || isCapturing} onClick={() => void capturePhoto()}>
-        {isCapturing ? 'Capturing…' : cameraReady ? 'Capture proof photo' : 'Starting camera…'}
+        {isCapturing ? 'Capturing…' : cameraReady ? captureLabel : 'Starting camera…'}
       </button>}
       {photo && <>
         <button type="button" className="outline-button" disabled={disabled} onClick={retakePhoto}>Retake photo</button>
         <button type="button" className="assignment-action evidence-submit-button" disabled={disabled} onClick={() => onSubmit(photo.file, photo.metadata)}>
-          {disabled ? 'Saving…' : 'Submit completion photo'}
+          {disabled ? 'Saving…' : submitLabel}
         </button>
       </>}
     </div>
