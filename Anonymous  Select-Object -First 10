@@ -1,0 +1,12 @@
+[33mf23f6fe[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m fix: reset complaint state after evidence rejection
+[33m5c5edc8[m chore: seed data, env example and README updates
+[33m4ae9bd6[m feat: Hindi and English multi-language support
+[33md226358[m feat: waste segregation guide and recycling center map
+[33mb501c43[m feat: basic volunteer drives
+[33mdf14e14[m feat: auto SLA escalation with cron job and overdue list
+[33mae80964[m feat: anonymous reporting
+[33m4ef073d[m fix: omit incomplete geo locations
+[33m63d9549[m style(ui): design system, header-first layout and Swachh-themed art
+[33m684f49e[m perf(mobile):responsive layout and login redesign
+[33m988e137[m style(ui): responsive layout and login redesign
+[33md78944d[m feat(proof): add camera and location permission helper modal
