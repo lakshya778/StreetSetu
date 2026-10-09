@@ -62,7 +62,14 @@
     "featureTriage": "AI-सहायित प्राथमिकता",
     "featureResolution": "पारदर्शी समाधान",
     "citizenReport": "नागरिक रिपोर्ट",
-    "accountableAction": "जवाबदेह कार्रवाई"
+    "accountableAction": "जवाबदेह कार्रवाई",
+    "howItWorks": "यह कैसे काम करता है",
+    "stepReport": "रिपोर्ट",
+    "stepReportDescription": "लाइव प्रमाण के साथ समस्या बताएँ।",
+    "stepAssigned": "सौंपा गया",
+    "stepAssignedDescription": "सही टीम कार्रवाई करती है।",
+    "stepResolved": "समाधान",
+    "stepResolvedDescription": "सत्यापित नतीजे को ट्रैक करें।"
   },
   "report": {
     "back": "शिकायतों पर वापस जाएँ",

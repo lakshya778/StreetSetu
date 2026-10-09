@@ -62,7 +62,14 @@
     "featureTriage": "AI-assisted triage",
     "featureResolution": "Transparent resolution",
     "citizenReport": "Citizen report",
-    "accountableAction": "Accountable action"
+    "accountableAction": "Accountable action",
+    "howItWorks": "How it works",
+    "stepReport": "Report",
+    "stepReportDescription": "Share an issue with live proof.",
+    "stepAssigned": "Assigned",
+    "stepAssignedDescription": "The right team takes action.",
+    "stepResolved": "Resolved",
+    "stepResolvedDescription": "Track the verified outcome."
   },
   "report": {
     "back": "Back to complaints",
