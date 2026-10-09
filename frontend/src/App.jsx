@@ -18,6 +18,8 @@ const PublicComplaintTrackingPage = lazy(() => import('./pages/PublicComplaintTr
 const OverdueComplaintsPage = lazy(() => import('./pages/OverdueComplaintsPage.jsx'));
 const VolunteerDrivesPage = lazy(() => import('./pages/VolunteerDrivesPage.jsx'));
 const SegregationGuidePage = lazy(() => import('./pages/SegregationGuidePage.jsx'));
+const LeaderboardPage = lazy(() => import('./pages/LeaderboardPage.jsx'));
+const MyImpactPage = lazy(() => import('./pages/MyImpactPage.jsx'));
 
 export default function App() {
   return (
@@ -40,6 +42,8 @@ export default function App() {
               <Route path="/dashboard/neighbourhoods" element={<WorkspacePage />} />
               <Route path="/dashboard/notifications" element={<NotificationPage />} />
               <Route path="/dashboard/drives" element={<VolunteerDrivesPage />} />
+              <Route path="/dashboard/leaderboard" element={<LeaderboardPage />} />
+              <Route path="/dashboard/impact" element={<MyImpactPage />} />
               <Route path="/dashboard/segregation-guide" element={<SegregationGuidePage />} />
             </Route>
           </Route>

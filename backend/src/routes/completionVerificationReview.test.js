@@ -7,6 +7,7 @@ import AuditLog from '../models/AuditLog.js';
 import User from '../models/User.js';
 import { signToken } from '../config/jwt.js';
 import { queueCompletionVerification } from '../services/completionVerificationService.js';
+import gamificationService from '../services/gamificationService.js';
 import assignmentRoutes from './assignmentRoutes.js';
 
 const complaintId = '65f0c3123456789012345678';
@@ -24,6 +25,7 @@ async function listen(t, app) {
 }
 
 test('evidence review API rejects back to in progress, then approves replacement proof', async (t) => {
+  const awarded = t.mock.method(gamificationService, 'awardPoints', async () => true);
   const state = {
     _id: complaintId,
     title: 'Demo street repair',
@@ -77,6 +79,7 @@ test('evidence review API rejects back to in progress, then approves replacement
   assert.equal(rejected.afterImages.length, 0);
   assert.equal(rejected.completionEvidenceHistory[0].verificationStatus, 'rejected');
   assert.equal(rejected.completionEvidenceHistory[0].images[0].url, 'original-proof');
+  assert.equal(awarded.mock.calls.length, 0);
 
   state.status = 'needs_review';
   state.afterImages.push({ url: 'replacement-proof', uploadedAt: new Date() });
@@ -115,6 +118,8 @@ test('evidence review API rejects back to in progress, then approves replacement
   assert.equal(approved.statusHistory.at(-1).changedBy, adminId);
   assert.equal(approved.statusHistory[0].proofHashes[0], 'a'.repeat(64));
   assert.equal(approved.statusHistory.at(-2).proofHashes[0], 'b'.repeat(64));
+  assert.deepEqual(awarded.mock.calls[0].arguments.slice(0, 2), [state.createdBy, 'complaint_resolved']);
+  assert.equal(awarded.mock.calls[0].arguments[2], state._id);
 });
 
 test('completion verification schema accepts rejected evidence state', async () => {

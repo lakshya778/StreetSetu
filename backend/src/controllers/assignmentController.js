@@ -8,6 +8,7 @@ import {
 import { recommendVolunteers } from '../services/assignmentRecommendationService.js';
 import { getVolunteerRoute } from '../services/routeOptimizationService.js';
 import { getCompletionVerification, listCompletionVerifications, reviewCompletionVerification } from '../services/completionVerificationService.js';
+import gamificationService from '../services/gamificationService.js';
 
 export async function assign(req, res, next) {
   try {
@@ -68,6 +69,12 @@ export async function completionVerifications(req, res, next) {
 }
 
 export async function reviewCompletion(req, res, next) {
-  try { return res.json({ success: true, data: await reviewCompletionVerification(req.params.complaintId, req.body.decision, req), message: 'Completion verification review saved' }); }
+  try {
+    const complaint = await reviewCompletionVerification(req.params.complaintId, req.body.decision, req);
+    if (req.body.decision === 'approve') {
+      await gamificationService.awardPoints(complaint.createdBy, 'complaint_resolved', complaint._id);
+    }
+    return res.json({ success: true, data: complaint, message: 'Completion verification review saved' });
+  }
   catch (error) { return next(error); }
 }

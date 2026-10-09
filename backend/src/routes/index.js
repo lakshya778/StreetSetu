@@ -12,6 +12,7 @@ import analyticsRoutes from './analyticsRoutes.js';
 import publicRoutes from './publicRoutes.js';
 import adminRoutes from './adminRoutes.js';
 import driveRoutes from './driveRoutes.js';
+import leaderboardRoutes from './leaderboardRoutes.js';
 
 const router = Router();
 
@@ -22,6 +23,7 @@ router.get('/health', (req, res) => {
 router.use('/public', publicRoutes);
 router.use('/admin', adminRoutes);
 router.use('/drives', driveRoutes);
+router.use('/leaderboard', leaderboardRoutes);
 
 router.use('/auth', authRoutes);
 router.use('/complaints', complaintRoutes);

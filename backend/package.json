@@ -9,6 +9,7 @@
     "start": "node src/server.js",
     "seed": "node scripts/seed.js",
     "migrate:feedback-leaderboard": "node scripts/migrations/20261006-feedback-leaderboard.js",
+    "gamification:backfill": "node scripts/gamification-backfill.js",
     "test": "node --test"
   },
   "dependencies": {

@@ -14,6 +14,8 @@ const baseNavigation = [
   { labelKey: 'nav.neighbourhoods', path: '/dashboard/neighbourhoods', icon: 'neighbourhoods' },
   { labelKey: 'nav.notifications', path: '/dashboard/notifications', icon: 'notifications' },
   { labelKey: 'nav.drives', path: '/dashboard/drives', icon: 'drives' },
+  { labelKey: 'nav.leaderboard', path: '/dashboard/leaderboard', icon: 'leaderboard' },
+  { labelKey: 'nav.myImpact', path: '/dashboard/impact', icon: 'impact' },
   { labelKey: 'nav.guide', path: '/dashboard/segregation-guide', icon: 'guide' }
 ];
 
@@ -26,6 +28,8 @@ function NavigationIcon({ name }) {
     notifications: <><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M10 21h4" /></>,
     drives: <><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" /><path d="m9 10 2 2 4-4" /></>,
     guide: <><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z" /><path d="m9 12 2 2 4-4" /></>,
+    leaderboard: <><path d="M8 21h8m-4-4v4M7 4h10v7a5 5 0 0 1-10 0Z" /><path d="M7 7H4v2a4 4 0 0 0 4 4m9-6h3v2a4 4 0 0 1-4 4" /></>,
+    impact: <><path d="M12 3v18m9-9H3" /><circle cx="12" cy="12" r="9" /></>,
     logout: <><path d="M10 17l5-5-5-5M15 12H3" /><path d="M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6" /></>
   };
   return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{paths[name] || paths.overview}</svg>;

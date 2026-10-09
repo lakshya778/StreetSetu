@@ -10,6 +10,7 @@
     "dev": "npm --prefix backend run dev",
     "frontend": "npm --prefix frontend run dev",
     "build": "npm --prefix frontend run build",
+    "gamification:backfill": "npm --prefix backend run gamification:backfill",
     "lint": "echo \"No lint configured yet\"",
     "test": "npm --prefix backend run test"
   },

@@ -13,6 +13,7 @@ import { recordAudit } from './auditService.js';
 import { requireVerifiedCompletion } from './completionVerificationService.js';
 import { redactComplaintReporter } from './complaintPrivacy.js';
 import { buildSlaDeadline } from './escalationService.js';
+import gamificationService from './gamificationService.js';
 import {
   notifyComplaintRejected,
   notifyComplaintImagesUploaded,
@@ -109,6 +110,7 @@ export async function createComplaint(payload, req) {
   result.voteCount = 0;
   result.supporterCount = 0;
   await recordAudit({ req, actorId: creator, action: 'complaint.created', entityType: 'complaint', entityId: complaint._id, newValue: 'submitted', metadata: { category: complaint.category } });
+  await gamificationService.awardPoints(creator, 'report_created', complaint._id);
   try {
     await notifyComplaintSubmitted({ complaint: result });
   } catch (error) {
@@ -301,8 +303,13 @@ export async function mergeDuplicateComplaint(id, masterId, req) {
 export async function voteForComplaint(id, req) {
   const complaint = await Complaint.findById(objectId(id, 'complaint id'));
   if (!complaint) throw new ComplaintError('Complaint not found', 404, 'NOT_FOUND');
-  try { await Vote.create({ complaint: complaint._id, user: userId(req) }); }
+  const supporter = userId(req);
+  let vote;
+  try { vote = await Vote.create({ complaint: complaint._id, user: supporter }); }
   catch (error) { if (error.code === 11000) throw new ComplaintError('You have already voted for this complaint', 409, 'CONFLICT'); throw error; }
+  if (String(complaint.createdBy?._id || complaint.createdBy) !== String(supporter)) {
+    await gamificationService.awardPoints(complaint.createdBy?._id || complaint.createdBy, 'support_received', vote._id);
+  }
   await recordAudit({ req, action: 'complaint.vote_added', entityType: 'complaint', entityId: complaint._id });
   const voteCount = await Vote.countDocuments({ complaint: complaint._id });
   await Complaint.updateOne({ _id: complaint._id }, { $set: { supporterCount: voteCount } });
@@ -313,8 +320,12 @@ export async function supportDuplicate(id, req) {
   const complaint = await Complaint.findById(objectId(id, 'complaint id'));
   if (!complaint) throw new ComplaintError('Complaint not found', 404, 'NOT_FOUND');
   const supporter = userId(req);
-  try { await Vote.create({ complaint: complaint._id, user: supporter }); }
+  let vote;
+  try { vote = await Vote.create({ complaint: complaint._id, user: supporter }); }
   catch (error) { if (error.code !== 11000) throw error; }
+  if (vote && String(complaint.createdBy?._id || complaint.createdBy) !== String(supporter)) {
+    await gamificationService.awardPoints(complaint.createdBy?._id || complaint.createdBy, 'support_received', vote._id);
+  }
   try { await DuplicateSupport.create({ complaint: complaint._id, user: supporter, category: complaint.category }); }
   catch (error) { if (error.code !== 11000) throw error; }
   const supporterCount = await Vote.countDocuments({ complaint: complaint._id });
@@ -325,8 +336,13 @@ export async function supportDuplicate(id, req) {
 
 export async function removeVote(id, req) {
   const complaintId = objectId(id, 'complaint id');
+  const complaint = await Complaint.findById(complaintId);
   const result = await Vote.findOneAndDelete({ complaint: complaintId, user: userId(req) });
   if (!result) throw new ComplaintError('Vote not found', 404, 'NOT_FOUND');
+  const ownerId = complaint?.createdBy?._id || complaint?.createdBy;
+  if (ownerId && String(ownerId) !== String(result.user)) {
+    await gamificationService.revokePoints(ownerId, 'support_received', result._id);
+  }
   await recordAudit({ req, action: 'complaint.vote_removed', entityType: 'complaint', entityId: complaintId });
   const voteCount = await Vote.countDocuments({ complaint: complaintId });
   await Complaint.updateOne({ _id: complaintId }, { $set: { supporterCount: voteCount } });

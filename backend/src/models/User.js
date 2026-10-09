@@ -15,6 +15,13 @@ const userLocationSchema = new mongoose.Schema({
   }
 }, { _id: false });
 
+const badgeSchema = new mongoose.Schema({
+  key: { type: String, required: true, trim: true },
+  label: { type: String, required: true, trim: true },
+  awardedAt: { type: Date, required: true },
+  month: { type: String, match: /^\d{4}-\d{2}$/ }
+}, { _id: false });
+
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
@@ -27,6 +34,10 @@ const userSchema = new mongoose.Schema(
     city: { type: String, trim: true, maxlength: 120 },
     availability: { type: String, enum: ['available', 'limited', 'unavailable', 'full_time', 'part_time', 'weekend', 'flexible'], default: 'available', index: true },
     location: { type: userLocationSchema, default: undefined },
+    totalPoints: { type: Number, default: 0, min: 0 },
+    monthlyPoints: { type: Number, default: 0, min: 0 },
+    monthlyPointsMonth: { type: String, match: /^\d{4}-\d{2}$/ },
+    badges: { type: [badgeSchema], default: [] },
     isActive: { type: Boolean, default: true }
   },
   { timestamps: true }

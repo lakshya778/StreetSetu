@@ -320,6 +320,8 @@ The API is rooted at `/api/v1`. Protected routes require an access token except 
 | `GET` | `/api/v1/analytics/hotspots` | Admin | Top complaint zones, outcome hotspots, and monthly hotspot metrics. |
 | `GET` | `/api/v1/analytics/geo-summary` | Admin | Aggregated complaint counts by city, area, category, and status. |
 | `GET` | `/api/v1/analytics/leaderboard` | Admin | Top volunteer weighted scores, ratings, response acceptance, and completion speed. |
+| `GET` | `/api/v1/leaderboard` | Authenticated | Top 20 community points with badge counts and current-user highlight; supports `scope=month\|all` and optional `ward`. |
+| `GET` | `/api/v1/users/me/stats` | Authenticated | Private current-user points, ranks, badges, civic impact estimate, and own resolved-report evidence. |
 | `GET` | `/api/v1/complaints/:id` | Owner, assignee, or admin | Complaint details, history, and evidence. |
 | `POST` | `/api/v1/complaints/:id/feedback` | Reporting citizen, resolved complaint | Submit one 1–5 star rating and optional comment for the assigned volunteer. |
 | `PATCH` | `/api/v1/complaints/:id/status` | Volunteer or admin | Update an allowed lifecycle state; rejection requires a reason. |
@@ -355,6 +357,8 @@ The API is rooted at `/api/v1`. Protected routes require an access token except 
 | `POST` | `/api/v1/ai/complaints/:id/classify` | Complaint-access user | Request AI classification for a complaint. |
 
 For complete request/response details, see [`docs/api-design.md`](docs/api-design.md) and the backend route validators. The AI service separately exposes `GET /health`, `POST /v1/classify`, and the internal completion-verification endpoints to the API service.
+
+Rebuild gamification ledger totals and badges from existing complaint, drive, and support records with `npm run gamification:backfill`.
 
 ### Real-time events
 
