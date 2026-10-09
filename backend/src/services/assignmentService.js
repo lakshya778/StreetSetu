@@ -7,7 +7,7 @@ import { emitToRole, publishComplaintUpdate, removeUserFromComplaintRoom } from 
 import { recordAudit } from './auditService.js';
 import { distanceInKm } from './assignmentRecommendationService.js';
 import { requireVerifiedCompletion } from './completionVerificationService.js';
-import { redactAssignmentReporters } from './complaintPrivacy.js';
+import { redactAssignmentReporters, redactComplaintReporter } from './complaintPrivacy.js';
 
 export class AssignmentError extends Error {
   constructor(message, statusCode = 400, code = 'ASSIGNMENT_ERROR', details) {
@@ -37,7 +37,7 @@ async function getVolunteer(volunteerId) {
 async function getComplaint(complaintId) {
   const complaint = await Complaint.findById(objectId(complaintId, 'complaint id'));
   if (!complaint) throw new AssignmentError('Complaint not found', 404, 'NOT_FOUND');
-  return redactComplaintReporter(complaint, req);
+  return complaint;
 }
 
 function statusFromWorkflow(status) {
@@ -238,5 +238,5 @@ export async function updateAssignedStatus(complaintId, { status, note }, req) {
   } catch (error) {
     console.error('Workflow notification failed:', error.message);
   }
-  return complaint;
+  return redactComplaintReporter(complaint, req);
 }
