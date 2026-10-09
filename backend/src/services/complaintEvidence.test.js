@@ -19,7 +19,6 @@ function upload(captureMetadata, options = {}) {
     latitude: 28.6139,
     longitude: 77.209,
     now,
-    env: {},
     ...options
   });
 }
@@ -38,11 +37,9 @@ test('live camera uploads are accepted with normalized metadata and a server-com
   assert.equal(photo.evidenceFlag, undefined);
 });
 
-test('development gallery uploads are rejected in production', () => {
+test('uploads reject every capture source except the live camera', () => {
   assert.throws(
-    () => upload([{ captureSource: 'dev_gallery' }], {
-      env: { ALLOW_DEV_GALLERY_PROOF: 'true', NODE_ENV: 'production' }
-    }),
+    () => upload([{ ...liveCapture, captureSource: 'other' }]),
     (error) => error.statusCode === 400 && error.message === 'Live camera capture required'
   );
 });
@@ -65,13 +62,4 @@ test('a live photo captured more than five minutes ago is flagged for time revie
     capturedAt: new Date(now.getTime() - 5 * 60 * 1000 - 1).toISOString()
   }]);
   assert.equal(photo.evidenceFlag, 'time_mismatch');
-});
-
-test('development gallery uploads require the explicit non-production opt-in', () => {
-  const [photo] = upload([{ captureSource: 'dev_gallery' }], {
-    env: { ALLOW_DEV_GALLERY_PROOF: 'true', NODE_ENV: 'development' }
-  });
-  assert.equal(photo.captureSource, 'dev_gallery');
-  assert.equal(photo.evidenceTag, 'dev_gallery');
-  assert.deepEqual(photo.imageMetadata, { captureSource: 'dev_gallery' });
 });

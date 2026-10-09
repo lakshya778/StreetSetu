@@ -26,7 +26,7 @@ const attachmentSchema = new mongoose.Schema(
     uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     uploadedAt: { type: Date },
     stage: { type: String, enum: ['complaint', 'before', 'after'], default: 'complaint' },
-    captureSource: { type: String, enum: ['live_camera', 'dev_gallery'] },
+    captureSource: { type: String, enum: ['live_camera'] },
     proofHash: { type: String, trim: true, minlength: 64, maxlength: 64 },
     evidenceFlag: { type: String, enum: ['location_mismatch', 'time_mismatch'] },
     imageMetadata: {
@@ -34,7 +34,7 @@ const attachmentSchema = new mongoose.Schema(
       longitude: { type: Number, min: -180, max: 180 },
       accuracy: { type: Number, min: 0 },
       capturedAt: { type: Date },
-      captureSource: { type: String, enum: ['live_camera', 'dev_gallery'] }
+      captureSource: { type: String, enum: ['live_camera'] }
     }
   },
   { _id: false }
@@ -81,7 +81,7 @@ const statusHistorySchema = new mongoose.Schema(
     },
     assignedVolunteer: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     note: { type: String, trim: true, maxlength: 1000 },
-    captureSource: { type: String, enum: ['live_camera', 'dev_gallery'] },
+    captureSource: { type: String, enum: ['live_camera'] },
     proofHashes: [{ type: String, trim: true, minlength: 64, maxlength: 64 }],
     gpsSource: { type: String, enum: ['device'] },
     distance: { type: Number, min: 0 },
@@ -161,7 +161,6 @@ const complaintSchema = new mongoose.Schema(
     duplicateOf: { type: mongoose.Schema.Types.ObjectId, ref: 'Complaint', index: true },
     supporterCount: { type: Number, min: 0, default: 0 },
     evidenceFlag: { type: String, enum: ['location_mismatch', 'time_mismatch'], index: true },
-    evidenceTag: { type: String, enum: ['dev_gallery'] },
     mergedAt: { type: Date },
     mergedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     escalated: { type: Boolean, default: false, index: true },

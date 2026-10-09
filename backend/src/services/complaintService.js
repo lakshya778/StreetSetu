@@ -97,7 +97,6 @@ export async function createComplaint(payload, req) {
     attachments: uniqueImagesByUrl(payload.attachments),
     evidenceFlag: payload.attachments.find((image) => image.evidenceFlag === 'location_mismatch')?.evidenceFlag
       || payload.attachments.find((image) => image.evidenceFlag === 'time_mismatch')?.evidenceFlag,
-    evidenceTag: payload.attachments.some((image) => image.captureSource === 'dev_gallery') ? 'dev_gallery' : undefined,
     beforeImages: uniqueImagesByUrl(payload.beforeImages),
     afterImages: uniqueImagesByUrl(payload.afterImages),
     allowDuplicate: undefined,

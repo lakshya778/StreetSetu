@@ -263,13 +263,6 @@ export async function reviewCompletionVerification(complaintId, decision, req) {
     error.details = { currentStatus: complaint.status, requestedStatus, reason: 'Completion verification is still pending.' };
     throw error;
   }
-  const latestProof = complaint.statusHistory.slice().reverse().find((event) => event.captureSource);
-  if (latestProof?.captureSource === 'dev_gallery' && decision === 'approve') {
-    const error = new Error('Development gallery evidence cannot be verified');
-    error.statusCode = 409;
-    error.code = 'DEV_GALLERY_CANNOT_BE_VERIFIED';
-    throw error;
-  }
   complaint.completionVerification.verificationStatus = decision === 'approve' ? 'verified' : 'rejected';
   complaint.completionVerification.reviewDecision = decision === 'approve' ? 'approved' : 'rejected';
   complaint.completionVerification.reviewedBy = req.user.sub;

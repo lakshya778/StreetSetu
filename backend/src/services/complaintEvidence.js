@@ -41,7 +41,6 @@ export function validateComplaintEvidenceUpload({
   captureMetadata: rawMetadata,
   latitude,
   longitude,
-  env = process.env,
   now = new Date()
 }) {
   if (!Array.isArray(files) || files.length < 1 || files.length > MAX_PHOTOS) {
@@ -56,48 +55,39 @@ export function validateComplaintEvidenceUpload({
   }
 
   return metadata.map((item, index) => {
-    if (!item || !['live_camera', 'dev_gallery'].includes(item.captureSource)) {
-      throw evidenceError('Live camera capture required', 'LIVE_CAMERA_REQUIRED');
-    }
-    if (item.captureSource === 'dev_gallery'
-      && (env.ALLOW_DEV_GALLERY_PROOF !== 'true' || env.NODE_ENV === 'production')) {
+    if (!item || item.captureSource !== 'live_camera') {
       throw evidenceError('Live camera capture required', 'LIVE_CAMERA_REQUIRED');
     }
 
     const normalized = { captureSource: item.captureSource };
-    if (item.captureSource === 'live_camera') {
-      const photoLatitude = Number(item.latitude);
-      const photoLongitude = Number(item.longitude);
-      const accuracy = Number(item.accuracy);
-      const capturedAt = new Date(item.capturedAt);
-      if (!validCoordinate(photoLatitude, -90, 90)
-        || !validCoordinate(photoLongitude, -180, 180)
-        || !Number.isFinite(accuracy) || accuracy < 0
-        || typeof item.capturedAt !== 'string' || !ISO_TIMESTAMP.test(item.capturedAt)
-        || Number.isNaN(capturedAt.getTime())) {
-        throw evidenceError('Valid live camera location, accuracy, and capture time are required');
-      }
-      normalized.imageMetadata = {
-        latitude: photoLatitude,
-        longitude: photoLongitude,
-        accuracy,
-        capturedAt,
-        captureSource: item.captureSource
-      };
-      if (Math.abs(now.getTime() - capturedAt.getTime()) > MAX_CAPTURE_AGE_MS) {
-        normalized.evidenceFlag = 'time_mismatch';
-      }
-      if (distanceMeters(
-        Number(latitude),
-        Number(longitude),
-        photoLatitude,
-        photoLongitude
-      ) > MAX_PHOTO_DISTANCE_METERS) {
-        normalized.evidenceFlag = 'location_mismatch';
-      }
-    } else {
-      normalized.imageMetadata = { captureSource: item.captureSource };
-      normalized.evidenceTag = 'dev_gallery';
+    const photoLatitude = Number(item.latitude);
+    const photoLongitude = Number(item.longitude);
+    const accuracy = Number(item.accuracy);
+    const capturedAt = new Date(item.capturedAt);
+    if (!validCoordinate(photoLatitude, -90, 90)
+      || !validCoordinate(photoLongitude, -180, 180)
+      || !Number.isFinite(accuracy) || accuracy < 0
+      || typeof item.capturedAt !== 'string' || !ISO_TIMESTAMP.test(item.capturedAt)
+      || Number.isNaN(capturedAt.getTime())) {
+      throw evidenceError('Valid live camera location, accuracy, and capture time are required');
+    }
+    normalized.imageMetadata = {
+      latitude: photoLatitude,
+      longitude: photoLongitude,
+      accuracy,
+      capturedAt,
+      captureSource: item.captureSource
+    };
+    if (Math.abs(now.getTime() - capturedAt.getTime()) > MAX_CAPTURE_AGE_MS) {
+      normalized.evidenceFlag = 'time_mismatch';
+    }
+    if (distanceMeters(
+      Number(latitude),
+      Number(longitude),
+      photoLatitude,
+      photoLongitude
+    ) > MAX_PHOTO_DISTANCE_METERS) {
+      normalized.evidenceFlag = 'location_mismatch';
     }
 
     const file = files[index];

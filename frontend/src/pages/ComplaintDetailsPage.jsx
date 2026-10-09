@@ -217,7 +217,7 @@ export default function ComplaintDetailsPage() {
           {latestProof && <div className="completion-proof-trust">
             <p>{latestProof.captureSource === 'live_camera'
               ? `Photo taken at ${formatDate(latestProof.capturedAt, 'datetime')}, ${Number.isFinite(Number(latestProof.distance)) ? `${Math.round(Number(latestProof.distance))} m` : 'distance unavailable'} from reported spot`
-              : `DEV gallery photo uploaded at ${formatDate(latestProof.changedAt, 'datetime')}`}</p>
+              : `Photo submitted at ${formatDate(latestProof.changedAt, 'datetime')}`}</p>
             <span className={`status-badge ${complaint.completionVerification?.verificationStatus === 'verified' ? 'resolved-badge' : ''}`}>
               {complaint.completionVerification?.verificationStatus === 'rejected'
                 ? 'Rejected'

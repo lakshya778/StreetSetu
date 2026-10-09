@@ -64,7 +64,7 @@ The following capabilities are **planned** and are not currently enabled:
 | Volunteer assignment | Admin assignment/reassignment and volunteer assignment list/status updates. |
 | Smart recommendations | Top-five volunteer recommendations weighted by proximity (50%), active workload (25%), resolution rate (15%), and availability (10%). Admins can review, assign manually, or auto-assign the highest-ranked available volunteer. |
 | Work evidence and images | Cloudinary-backed image upload configuration; complaint images and work-start evidence remain file uploads. Completion proof is captured by the live camera with a device GPS/time watermark and stored with its capture metadata. |
-| Completion verification | Device time, GPS distance and accuracy are checked before the existing verification flow; flagged proofs require admin review. Development gallery proofs are review-only and gated by local development flags. |
+| Completion verification | Live camera device time, GPS distance and accuracy are checked before the existing verification flow; flagged proofs require admin review. |
 | Location support | GeoJSON point coordinates, Leaflet/OpenStreetMap maps, map complaint listing, and nearby complaint lookup. |
 | Notifications | In-app and reusable HTML/text SMTP email updates for submission, assignment, resolution, rejection, and volunteer assignment; Socket.IO sends live in-app updates. |
 | Real-time updates | Socket.IO with JWT authentication, user/role rooms, authorized complaint subscriptions, and complaint/dashboard update events. |

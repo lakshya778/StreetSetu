@@ -76,16 +76,11 @@ export async function addWorkEvidence({ complaintId, stage, files, req }) {
   let receivedAt;
   if (stage === 'after') {
     captureSource = req.body.captureSource;
-    if (captureSource === 'dev_gallery') {
-      if (process.env.ALLOW_DEV_GALLERY_PROOF !== 'true' || process.env.NODE_ENV === 'production') {
-        throw evidenceError('Live camera capture required', 400, 'LIVE_CAMERA_REQUIRED');
-      }
-    } else if (captureSource === 'live_camera') {
-      liveCapture = parseLiveCapture(req.body);
-      receivedAt = new Date();
-    } else {
+    if (captureSource !== 'live_camera') {
       throw evidenceError('Live camera capture required', 400, 'LIVE_CAMERA_REQUIRED');
     }
+    liveCapture = parseLiveCapture(req.body);
+    receivedAt = new Date();
   }
 
   const target = stage === 'before' ? complaint.beforeImages : complaint.afterImages;
@@ -135,15 +130,11 @@ export async function addWorkEvidence({ complaintId, stage, files, req }) {
   let verificationFailureReason = null;
   let distance = null;
   if (stage === 'after') {
-    if (captureSource === 'dev_gallery') {
-      verificationFailureReason = 'Development gallery evidence needs admin review.';
-    } else {
-      const timeDifference = Math.abs(receivedAt.getTime() - liveCapture.capturedAt.getTime());
-      distance = haversineDistanceMeters(complaint.latitude, complaint.longitude, liveCapture.latitude, liveCapture.longitude);
-      if (timeDifference > 2 * 60 * 1000) verificationFailureReason = 'Capture time mismatch';
-      else if (distance > 100) verificationFailureReason = `Photo taken ${Math.round(distance)} m away from reported location`;
-      else if (liveCapture.accuracy > 100) verificationFailureReason = 'Low GPS accuracy';
-    }
+    const timeDifference = Math.abs(receivedAt.getTime() - liveCapture.capturedAt.getTime());
+    distance = haversineDistanceMeters(complaint.latitude, complaint.longitude, liveCapture.latitude, liveCapture.longitude);
+    if (timeDifference > 2 * 60 * 1000) verificationFailureReason = 'Capture time mismatch';
+    else if (distance > 100) verificationFailureReason = `Photo taken ${Math.round(distance)} m away from reported location`;
+    else if (liveCapture.accuracy > 100) verificationFailureReason = 'Low GPS accuracy';
     complaint.status = 'needs_review';
     complaint.statusHistory.push({
       eventType: 'status_changed',
@@ -154,13 +145,11 @@ export async function addWorkEvidence({ complaintId, stage, files, req }) {
       note: verificationFailureReason || 'Completion photos submitted for verification',
       captureSource,
       proofHashes: files.map((file) => createHash('sha256').update(file.buffer).digest('hex')),
-      ...(captureSource === 'live_camera' ? {
-        gpsSource: 'device',
-        distance,
-        accuracy: liveCapture.accuracy,
-        capturedAt: liveCapture.capturedAt
-      } : {}),
-      changedAt: receivedAt || new Date()
+      gpsSource: 'device',
+      distance,
+      accuracy: liveCapture.accuracy,
+      capturedAt: liveCapture.capturedAt,
+      changedAt: receivedAt
     });
     if (verificationFailureReason) {
       complaint.completionVerification = {
@@ -168,9 +157,9 @@ export async function addWorkEvidence({ complaintId, stage, files, req }) {
         failureReason: verificationFailureReason,
         requestedAt: receivedAt || new Date(),
         checkedAt: receivedAt || new Date(),
-        gpsMatched: captureSource === 'live_camera' ? distance <= 100 : undefined,
+        gpsMatched: distance <= 100,
         gpsDistanceMeters: distance ?? undefined,
-        timestampValid: captureSource === 'live_camera' ? Math.abs(receivedAt.getTime() - liveCapture.capturedAt.getTime()) <= 2 * 60 * 1000 : undefined
+        timestampValid: timeDifference <= 2 * 60 * 1000
       };
     }
   }

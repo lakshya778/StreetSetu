@@ -4,7 +4,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/client.js';
 import { checkComplaintDuplicates, classifyComplaint, complaintCategories, createComplaint, complaintPriorities, supportDuplicateComplaint, uploadComplaintImages } from '../api/complaints.js';
 import LiveCameraCapture from '../components/media/LiveCameraCapture.jsx';
-import DevGalleryProof from '../components/media/DevGalleryProof.jsx';
 import DuplicateWarningModal from '../components/complaints/DuplicateWarningModal.jsx';
 import LocationPicker from '../components/maps/LocationPicker.jsx';
 import PageHeader from '../components/layout/PageHeader.jsx';
@@ -39,7 +38,6 @@ export default function CreateComplaintPage() {
   const [duplicateCandidate, setDuplicateCandidate] = useState(null);
   const [duplicateSupported, setDuplicateSupported] = useState(false);
   const [cameraCaptureKey, setCameraCaptureKey] = useState(0);
-  const [galleryCaptureKey, setGalleryCaptureKey] = useState(0);
   const [locationMismatchConfirmed, setLocationMismatchConfirmed] = useState(false);
   const locationSelectionRef = useRef(0);
   const photoPreviews = useMemo(() => photos.map((photo) => ({
@@ -93,7 +91,6 @@ export default function CreateComplaintPage() {
       void selectFirstPhotoLocation(metadata);
     }
     setCameraCaptureKey((current) => current + 1);
-    setGalleryCaptureKey((current) => current + 1);
   }
 
   function removePhoto(index) {
@@ -202,7 +199,7 @@ export default function CreateComplaintPage() {
           {photoPreviews.map((photo, index) => <figure className="captured-report-photo" key={`${photo.file.name}-${index}`}>
             <img src={photo.previewUrl} alt={t('report.photoPreviewAlt', { number: index + 1 })} width="400" height="300" />
             <figcaption>
-              <span>{photo.metadata.captureSource === 'live_camera' ? t('report.liveCaptureBadge') : t('report.devGalleryBadge')}</span>
+              <span>{t('report.liveCaptureBadge')}</span>
               {photo.metadata.capturedAt && <small>{t('report.photoTakenAt', { time: new Date(photo.metadata.capturedAt).toLocaleString(i18n.resolvedLanguage === 'hi' ? 'hi-IN' : 'en-IN') })}</small>}
               <button type="button" className="outline-button" disabled={isSubmitting || Boolean(createdComplaint)} onClick={() => removePhoto(index)}>{t('report.removePhoto')}</button>
             </figcaption>
@@ -213,14 +210,6 @@ export default function CreateComplaintPage() {
           disabled={isSubmitting || Boolean(createdComplaint)}
           captureLabel={t('report.takePhoto')}
           submitLabel={t('report.usePhoto')}
-          onSubmit={addPhoto}
-        />}
-        {photos.length < 5 && <DevGalleryProof
-          key={galleryCaptureKey}
-          disabled={isSubmitting || Boolean(createdComplaint)}
-          chooseLabel={t('report.devGalleryChoose')}
-          submitLabel={t('report.devGalleryAdd')}
-          bannerLabel={t('report.devGalleryBanner')}
           onSubmit={addPhoto}
         />}
         {hasPhotoLocationMismatch && <div className="evidence-location-warning" role="alert">

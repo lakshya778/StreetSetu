@@ -62,16 +62,12 @@ function validateAttachments(attachments, details) {
     if (attachment?.size !== undefined && (!Number.isInteger(attachment.size) || attachment.size < 0 || attachment.size > 5 * 1024 * 1024)) {
       details.push({ field: `attachments.${index}.size`, message: 'Attachment size must be between 0 and 5 MB' });
     }
-    if (!['live_camera', 'dev_gallery'].includes(attachment?.captureSource)
+    if (attachment?.captureSource !== 'live_camera'
       || attachment?.imageMetadata?.captureSource !== attachment?.captureSource) {
       details.push({ field: `attachments.${index}.captureSource`, message: 'Live camera capture required' });
     }
     if (!/^[a-f\d]{64}$/i.test(attachment?.proofHash || '')) {
       details.push({ field: `attachments.${index}.proofHash`, message: 'A valid server evidence hash is required' });
-    }
-    if (attachment?.captureSource === 'dev_gallery'
-      && (process.env.ALLOW_DEV_GALLERY_PROOF !== 'true' || process.env.NODE_ENV === 'production')) {
-      details.push({ field: `attachments.${index}.captureSource`, message: 'Live camera capture required' });
     }
     if (attachment?.captureSource === 'live_camera') {
       const metadata = attachment.imageMetadata || {};

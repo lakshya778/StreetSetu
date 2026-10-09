@@ -115,6 +115,21 @@ test('complaint creation rejects an empty photo list', () => {
   assert.ok(validationError.details.some((detail) => detail.field === 'attachments'));
 });
 
+test('complaint creation rejects any non-live capture source', () => {
+  const req = { body: {
+    title: 'Overflowing bin near market',
+    description: 'The public waste bin has been overflowing since yesterday.',
+    category: 'waste_management',
+    latitude: 28.6,
+    longitude: 77.2,
+    attachments: [{ ...liveAttachment, captureSource: 'unsupported', imageMetadata: { ...liveAttachment.imageMetadata, captureSource: 'unsupported' } }]
+  } };
+  let validationError;
+  validateCreateComplaint(req, {}, (error) => { validationError = error; });
+  assert.equal(validationError?.statusCode, 400);
+  assert.ok(validationError.details.some((detail) => detail.field === 'attachments.0.captureSource'));
+});
+
 test('duplicate checks remain valid without photo attachments', () => {
   const req = { body: {
     title: 'Overflowing bin near market',
