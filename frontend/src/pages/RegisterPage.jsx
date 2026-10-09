@@ -10,7 +10,7 @@ export default function RegisterPage() {
   const { t } = useTranslation();
   const { user, register } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'citizen' });
+  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'citizen', referralCode: '' });
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -48,6 +48,7 @@ export default function RegisterPage() {
               <label>{t('auth.fullName')}<input name="name" type="text" autoComplete="name" value={form.name} onChange={updateField} placeholder={t('auth.namePlaceholder')} required minLength="2" /></label>
               <label>{t('auth.email')}<input name="email" type="email" autoComplete="email" value={form.email} onChange={updateField} placeholder={t('auth.emailPlaceholder')} required /></label>
               <label>{t('auth.password')}<div className="password-field"><input name="password" type={showPassword ? 'text' : 'password'} autoComplete="new-password" value={form.password} onChange={updateField} placeholder={t('auth.newPasswordPlaceholder')} required minLength="8" /><button className="password-toggle" type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')} aria-pressed={showPassword}>{showPassword ? t('auth.hidePassword') : t('auth.showPassword')}</button></div></label>
+              <label><span className="auth-label-copy">{t('auth.referralCode')} <small className="optional-label">{t('auth.optional')}</small></span><input name="referralCode" type="text" autoComplete="off" value={form.referralCode} onChange={updateField} placeholder={t('auth.referralCodePlaceholder')} maxLength="24" /></label>
               <fieldset className="role-choice">
                 <legend>{t('auth.participate')}</legend>
                 <label className={`role-choice-card ${form.role === 'citizen' ? 'selected' : ''}`}>

@@ -8,11 +8,13 @@ import DuplicateWarningModal from '../components/complaints/DuplicateWarningModa
 import LocationPicker from '../components/maps/LocationPicker.jsx';
 import PageHeader from '../components/layout/PageHeader.jsx';
 import NearbyComplaintsPanel from '../components/complaints/NearbyComplaintsPanel.jsx';
+import reportTips from '../data/reportTips.json';
 
 const initialForm = { title: '', description: '', category: 'roads', priority: 'medium', isAnonymous: false, latitude: '', longitude: '', address: '', city: '', area: '' };
+let nextEducationalTip = 0;
 
 export default function CreateComplaintPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [form, setForm] = useState(initialForm);
   const [files, setFiles] = useState([]);
@@ -21,6 +23,8 @@ export default function CreateComplaintPage() {
   const [uploadProgress, setUploadProgress] = useState(null);
   const [classification, setClassification] = useState(null);
   const [createdComplaint, setCreatedComplaint] = useState(null);
+  const [tipIndex, setTipIndex] = useState(0);
+  const [showEducationalTip, setShowEducationalTip] = useState(false);
   const [duplicateCandidate, setDuplicateCandidate] = useState(null);
   const [duplicateSupported, setDuplicateSupported] = useState(false);
 
@@ -60,6 +64,9 @@ export default function CreateComplaintPage() {
       const attachments = files.length ? await uploadComplaintImages(files, setUploadProgress) : [];
       const complaint = await createComplaint({ ...form, latitude, longitude, attachments, allowDuplicate });
       setCreatedComplaint(complaint);
+      setTipIndex(nextEducationalTip % reportTips.en.length);
+      nextEducationalTip += 1;
+      setShowEducationalTip(true);
       try {
         setClassification(await classifyComplaint(complaint._id));
       } catch {
@@ -95,6 +102,7 @@ export default function CreateComplaintPage() {
     <DuplicateWarningModal candidate={duplicateCandidate} busy={isSubmitting} supported={duplicateSupported} error={error} onSupport={supportExisting} onContinue={() => { dismissDuplicatePrompt(); void submitComplaint(true); }} onReview={dismissDuplicatePrompt} onBack={dismissDuplicatePrompt} onClose={dismissDuplicatePrompt} onViewComplaint={(complaintId) => { dismissDuplicatePrompt(); navigate(`/dashboard/complaints/${complaintId}`); }} />
     <Link className="back-link" to="/dashboard/complaints">← {t('report.back')}</Link>
     <PageHeader kicker={t('report.kicker')} title={t('report.title')} subtitle={t('report.subtitle')} />
+    {showEducationalTip && <aside className="report-education-tip" role="status"><span aria-hidden="true">✦</span><p><strong>{t('report.communityTip')}</strong> {reportTips[i18n.resolvedLanguage === 'hi' ? 'hi' : 'en'][tipIndex]}</p></aside>}
     {classification && <section className="ai-prediction panel"><div><p className="eyebrow">{t('report.aiSuggestion')}</p><h2>{t('report.aiHeading')}</h2><p className="ai-prediction-note">{t('report.aiNote')}</p></div><div className="ai-prediction-values"><div><span>{t('report.category')}</span><strong>{t(`category.${classification.category}`, { defaultValue: classification.category.replaceAll('_', ' ') })}</strong></div><div><span>{t('report.priority')}</span><strong className={`prediction-${classification.priority}`}>{t(`priority.${classification.priority}`, { defaultValue: classification.priority })}</strong></div><div><span>{t('report.confidence')}</span><strong>{Math.round(classification.confidence * 100)}%</strong></div></div><Link className="text-button" to={`/dashboard/complaints/${createdComplaint?._id}`}>{t('report.openComplaint')} <span>→</span></Link></section>}
     <form className="complaint-form panel" onSubmit={handleSubmit}>
       <div className="form-section"><p className="form-section-title">{t('report.issue')}</p><label>{t('report.titleLabel')}<input name="title" value={form.title} onChange={updateField} placeholder={t('report.titlePlaceholder')} required minLength="5" maxLength="160" /></label><label>{t('report.description')}<textarea name="description" value={form.description} onChange={updateField} placeholder={t('report.descriptionPlaceholder')} required minLength="10" maxLength="5000" rows="5" /></label><div className="form-row"><label>{t('report.category')}<select name="category" value={form.category} onChange={updateField}>{complaintCategories.map((category) => <option key={category} value={category}>{t(`category.${category}`)}</option>)}</select></label><label>{t('report.priority')}<select name="priority" value={form.priority} onChange={updateField}>{complaintPriorities.map((priority) => <option key={priority} value={priority}>{t(`priority.${priority}`)}</option>)}</select></label></div><label className="anonymous-report-toggle"><input type="checkbox" name="isAnonymous" checked={form.isAnonymous} onChange={(event) => setForm((current) => ({ ...current, isAnonymous: event.target.checked }))} /><span><strong>{t('report.reportAnonymously')}</strong><small>{t('report.anonymousHelp')}</small></span></label></div>

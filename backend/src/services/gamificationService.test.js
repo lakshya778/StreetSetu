@@ -6,7 +6,7 @@ import Drive from '../models/Drive.js';
 import PointEvent from '../models/PointEvent.js';
 import User from '../models/User.js';
 import Vote from '../models/Vote.js';
-import gamificationService from './gamificationService.js';
+import gamificationService, { gamificationServiceInternals } from './gamificationService.js';
 
 const userId = '65f0c3123456789012345681';
 const referenceId = '65f0c3123456789012345678';
@@ -29,9 +29,9 @@ test('point event is inserted once, increments balances atomically, and grants t
   assert.equal(create.mock.calls[0].arguments[0].points, 5);
   assert.equal(create.mock.calls[0].arguments[0].refType, 'complaint');
   assert.match(create.mock.calls[0].arguments[0].month, /^\d{4}-\d{2}$/);
-  assert.equal(update.mock.calls.length, 2);
-  assert.deepEqual(update.mock.calls[0].arguments[1].$inc, { totalPoints: 5, monthlyPoints: 5 });
-  assert.equal(update.mock.calls[1].arguments[0]['badges.key'].$ne, 'first_report');
+  assert.equal(update.mock.calls.length, 3);
+  assert.deepEqual(update.mock.calls[1].arguments[1].$inc, { totalPoints: 5, monthlyPoints: 5 });
+  assert.equal(update.mock.calls[2].arguments[0]['badges.key'].$ne, 'first_report');
   assert.equal(aggregate.mock.calls.length, 1);
 });
 
@@ -42,6 +42,25 @@ test('duplicate point events do not increment user balances', async (t) => {
 
   assert.equal(await gamificationService.awardPoints(userId, 'report_created', referenceId), false);
   assert.equal(update.mock.calls.length, 0);
+});
+
+test('referral bonuses are ledger events worth 20 points', async (t) => {
+  mockConnectedDatabase(t);
+  const create = t.mock.method(PointEvent, 'create', async (event) => event);
+  t.mock.method(PointEvent, 'aggregate', async () => []);
+  t.mock.method(User, 'updateOne', async () => ({ matchedCount: 1 }));
+  t.mock.method(User, 'findById', () => ({ select: () => ({ lean: async () => ({ totalPoints: 20 }) }) }));
+
+  assert.equal(await gamificationService.awardPoints(userId, 'referral_bonus', referenceId), true);
+  assert.equal(create.mock.calls[0].arguments[0].points, 20);
+  assert.equal(create.mock.calls[0].arguments[0].refType, 'user');
+});
+
+test('report streak weeks use ISO week boundaries in the India timezone', () => {
+  assert.equal(gamificationServiceInternals.isoWeek(new Date('2026-01-04T18:00:00Z')), '2026-W01');
+  assert.equal(gamificationServiceInternals.isoWeek(new Date('2026-01-05T00:00:00Z')), '2026-W02');
+  assert.equal(gamificationServiceInternals.previousIsoWeek('2026-W01'), '2025-W52');
+  assert.equal(gamificationServiceInternals.currentMonth(new Date('2026-09-30T19:00:00Z')), '2026-10');
 });
 
 test('support removal deletes its event and decrements points without a negative balance', async (t) => {
@@ -76,6 +95,33 @@ test('leaderboard response exposes display names and points but never user ident
   assert.deepEqual(rows, [{ rank: 1, displayName: 'Neighbour One', points: 15, badgesCount: 1, isMe: true }]);
 });
 
+test('area leaderboard excludes anonymous complaint activity so it cannot be attributed to a person', async (t) => {
+  mockConnectedDatabase(t);
+  let complaintFilter;
+  const complaintId = new mongoose.Types.ObjectId();
+  const voteId = new mongoose.Types.ObjectId();
+  t.mock.method(Complaint, 'find', (filter) => {
+    complaintFilter = filter;
+    return { select() { return this; }, lean: async () => [{ _id: complaintId }] };
+  });
+  t.mock.method(Vote, 'find', () => ({
+    select() { return this; },
+    lean: async () => [{ _id: voteId }]
+  }));
+  t.mock.method(PointEvent, 'aggregate', async () => [{ _id: new mongoose.Types.ObjectId(userId), points: 5 }]);
+  t.mock.method(User, 'find', () => ({
+    select() {
+      return { lean: async () => [{ _id: new mongoose.Types.ObjectId(userId), name: 'Neighbour One', badges: [] }] };
+    }
+  }));
+
+  const rows = await gamificationService.getLeaderboard({ scope: 'all', ward: 'Central Ward' });
+  assert.deepEqual(complaintFilter.isAnonymous, { $ne: true });
+  assert.deepEqual(rows.map(({ displayName, points }) => ({ displayName, points })), [
+    { displayName: 'Neighbour One', points: 5 }
+  ]);
+});
+
 test('private impact stats include only the user’s own resolved photo comparisons', async (t) => {
   mockConnectedDatabase(t);
   const id = new mongoose.Types.ObjectId(userId);
@@ -86,6 +132,7 @@ test('private impact stats include only the user’s own resolved photo comparis
       totalPoints: 125,
       monthlyPoints: 25,
       monthlyPointsMonth,
+      referralCode: 'ABCD12345678',
       badges: [{ key: 'first_report', label: 'First Report', awardedAt: new Date() }]
     }) })
   }));

@@ -5,14 +5,15 @@ export const POINT_EVENT_TYPES = [
   'complaint_resolved',
   'drive_joined',
   'drive_organized',
-  'support_received'
+  'support_received',
+  'referral_bonus'
 ];
 
 const pointEventSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   type: { type: String, enum: POINT_EVENT_TYPES, required: true },
   points: { type: Number, required: true, min: 1 },
-  refType: { type: String, enum: ['complaint', 'drive', 'vote'], required: true },
+  refType: { type: String, enum: ['complaint', 'drive', 'vote', 'user'], required: true },
   refId: { type: mongoose.Schema.Types.ObjectId, required: true },
   month: { type: String, required: true, match: /^\d{4}-\d{2}$/ },
   createdAt: { type: Date, required: true, default: Date.now }

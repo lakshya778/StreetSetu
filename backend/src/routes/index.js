@@ -13,6 +13,7 @@ import publicRoutes from './publicRoutes.js';
 import adminRoutes from './adminRoutes.js';
 import driveRoutes from './driveRoutes.js';
 import leaderboardRoutes from './leaderboardRoutes.js';
+import gamificationRoutes from './gamificationRoutes.js';
 
 const router = Router();
 
@@ -24,6 +25,7 @@ router.use('/public', publicRoutes);
 router.use('/admin', adminRoutes);
 router.use('/drives', driveRoutes);
 router.use('/leaderboard', leaderboardRoutes);
+router.use('/gamification', gamificationRoutes);
 
 router.use('/auth', authRoutes);
 router.use('/complaints', complaintRoutes);

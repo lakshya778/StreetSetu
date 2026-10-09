@@ -4,13 +4,15 @@ import Drive from '../models/Drive.js';
 import PointEvent from '../models/PointEvent.js';
 import User from '../models/User.js';
 import Vote from '../models/Vote.js';
+import { ensureReferralCode } from './referralService.js';
 
 const POINT_RULES = {
   report_created: { points: 5, refType: 'complaint' },
   complaint_resolved: { points: 10, refType: 'complaint' },
   drive_joined: { points: 15, refType: 'drive' },
   drive_organized: { points: 25, refType: 'drive' },
-  support_received: { points: 2, refType: 'vote' }
+  support_received: { points: 2, refType: 'vote' },
+  referral_bonus: { points: 20, refType: 'user' }
 };
 const BADGES = [
   { key: 'first_report', label: 'First Report', condition: (counts) => counts.report_created >= 1 },
@@ -24,7 +26,52 @@ const RESOLVED_STATUSES = ['resolved', 'closed'];
 const IMPACT_ESTIMATE_PER_RESOLUTION = 25;
 
 function currentMonth(date = new Date()) {
-  return date.toISOString().slice(0, 7);
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit'
+  }).formatToParts(date);
+  return `${parts.find((part) => part.type === 'year').value}-${parts.find((part) => part.type === 'month').value}`;
+}
+
+function isoWeek(date) {
+  const localDate = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date);
+  const value = new Date(Date.UTC(
+    Number(localDate.find((part) => part.type === 'year').value),
+    Number(localDate.find((part) => part.type === 'month').value) - 1,
+    Number(localDate.find((part) => part.type === 'day').value)
+  ));
+  value.setUTCDate(value.getUTCDate() + 4 - (value.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(value.getUTCFullYear(), 0, 1));
+  const week = Math.ceil((((value - yearStart) / 86400000) + 1) / 7);
+  return `${value.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+}
+
+function previousIsoWeek(week) {
+  const [year, weekNumber] = week.split('-W').map(Number);
+  const monday = new Date(Date.UTC(year, 0, 4 + ((weekNumber - 1) * 7)));
+  monday.setUTCDate(monday.getUTCDate() - ((monday.getUTCDay() + 6) % 7));
+  monday.setUTCDate(monday.getUTCDate() - 7);
+  return isoWeek(monday);
+}
+
+async function updateReportStreak(userId, occurredAt) {
+  const week = isoWeek(occurredAt);
+  const previousWeek = previousIsoWeek(week);
+  const continued = await User.updateOne(
+    { _id: userId, lastReportWeek: previousWeek },
+    { $inc: { streakWeeks: 1 }, $set: { lastReportWeek: week } }
+  );
+  if (continued.matchedCount) return;
+  await User.updateOne(
+    { _id: userId, lastReportWeek: { $ne: week } },
+    { $set: { streakWeeks: 1, lastReportWeek: week } }
+  );
 }
 
 function asObjectId(value, label) {
@@ -82,6 +129,14 @@ export async function awardPoints(userIdValue, type, refIdValue, occurredAt = ne
     } catch (error) {
       if (error?.code === 11000) return false;
       throw error;
+    }
+
+    if (type === 'report_created') {
+      try {
+        await updateReportStreak(userId, createdAt);
+      } catch (error) {
+        logGamificationError('update report streak', error, { userId: String(userId), refId: String(refId) });
+      }
     }
 
     const monthlyIncrement = {
@@ -174,7 +229,7 @@ export async function rebuildGamificationData() {
   await PointEvent.init();
 
   const [users, complaints, drives, votes] = await Promise.all([
-    User.find({}).select('_id').lean(),
+    User.find({}).select('_id badges referredBy createdAt').lean(),
     Complaint.find({}).select('_id createdBy status completionVerification.reviewDecision createdAt updatedAt resolvedAt').lean(),
     Drive.find({}).select('_id createdBy participants participantHistory createdAt').lean(),
     Vote.find({}).populate('complaint', 'createdBy').lean()
@@ -218,6 +273,12 @@ export async function rebuildGamificationData() {
     events.push(buildEvent(ownerId, 'support_received', 'vote', vote._id, vote.createdAt));
   }
 
+  for (const user of users) {
+    if (user.referredBy && String(user.referredBy) !== String(user._id)) {
+      events.push(buildEvent(user.referredBy, 'referral_bonus', 'user', user._id, user.createdAt));
+    }
+  }
+
   await PointEvent.deleteMany({});
   for (let index = 0; index < events.length; index += 1000) {
     await PointEvent.insertMany(events.slice(index, index + 1000), { ordered: true });
@@ -234,8 +295,10 @@ export async function rebuildGamificationData() {
     eventGroups.set(id, summary);
   }
 
-  const operations = users.map(({ _id }) => {
+  const operations = users.map(({ _id, badges = [] }) => {
     const summary = eventGroups.get(String(_id)) || { totalPoints: 0, monthlyPoints: 0, events: [] };
+    const earnedBadges = eventCountsToBadges(summary.events, summary.totalPoints);
+    const permanentMonthlyBadges = badges.filter((badge) => /^monthly_(champion|top3)_\d{4}-\d{2}$/.test(badge.key));
     return {
       updateOne: {
         filter: { _id },
@@ -244,7 +307,7 @@ export async function rebuildGamificationData() {
             totalPoints: summary.totalPoints,
             monthlyPoints: summary.monthlyPoints,
             monthlyPointsMonth: nowMonth,
-            badges: eventCountsToBadges(summary.events, summary.totalPoints)
+            badges: [...earnedBadges, ...permanentMonthlyBadges]
           }
         }
       }
@@ -257,9 +320,21 @@ export async function rebuildGamificationData() {
   return { users: users.length, pointEvents: events.length };
 }
 
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 async function getWardEvents(wardId, month) {
-  const wardObjectId = asObjectId(wardId, 'ward id');
-  const complaints = await Complaint.find({ wardId: wardObjectId }).select('_id').lean();
+  const locationFilter = mongoose.isValidObjectId(wardId)
+    ? { wardId: asObjectId(wardId, 'ward id') }
+    : {
+      $or: [
+        { area: { $regex: `^${escapeRegex(String(wardId).trim())}$`, $options: 'i' } },
+        { city: { $regex: `^${escapeRegex(String(wardId).trim())}$`, $options: 'i' } },
+        { address: { $regex: `^${escapeRegex(String(wardId).trim())}(?:,|$)`, $options: 'i' } }
+      ]
+    };
+  const complaints = await Complaint.find({ ...locationFilter, isAnonymous: { $ne: true } }).select('_id').lean();
   const complaintIds = complaints.map((complaint) => complaint._id);
   if (!complaintIds.length) return [];
   const votes = await Vote.find({ complaint: { $in: complaintIds } }).select('_id').lean();
@@ -321,9 +396,9 @@ export async function getMyGamificationStats(userIdValue) {
   await ensureDatabaseConnection();
   const userId = asObjectId(userIdValue, 'user id');
   const [user, complaints, drivesJoined, drivesOrganized] = await Promise.all([
-    User.findById(userId).select('totalPoints monthlyPoints monthlyPointsMonth badges').lean(),
+    User.findById(userId).select('totalPoints monthlyPoints monthlyPointsMonth badges streakWeeks lastReportWeek referralCode').lean(),
     Complaint.find({ createdBy: userId })
-      .select('_id title status beforeImages afterImages resolvedAt').sort({ createdAt: -1 }).lean(),
+      .select('_id title status beforeImages afterImages resolvedAt wardId area city address').sort({ createdAt: -1 }).lean(),
     Drive.countDocuments({
       createdBy: { $ne: userId },
       $or: [{ participants: userId }, { 'participantHistory.user': userId }]
@@ -336,10 +411,34 @@ export async function getMyGamificationStats(userIdValue) {
     error.code = 'NOT_FOUND';
     throw error;
   }
+  if (!user.referralCode) user.referralCode = await ensureReferralCode(userId);
 
   const resolved = complaints.filter((complaint) => RESOLVED_STATUSES.includes(complaint.status));
   const month = currentMonth();
   const monthlyPoints = user.monthlyPointsMonth === month ? user.monthlyPoints || 0 : 0;
+  const latestLocation = complaints.find((complaint) => complaint.wardId || complaint.area || complaint.city || complaint.address);
+  const communityLocation = latestLocation && (
+    latestLocation.wardId
+      ? { label: latestLocation.area || latestLocation.city || 'Ward', key: String(latestLocation.wardId) }
+      : latestLocation.area
+        ? { label: latestLocation.area, key: latestLocation.area }
+        : latestLocation.city
+          ? { label: latestLocation.city, key: latestLocation.city }
+          : { label: latestLocation.address.split(',')[0].trim(), key: latestLocation.address.split(',')[0].trim() }
+  );
+  let communityRank = null;
+  if (communityLocation?.key) {
+    const wardTotals = await getWardEvents(communityLocation.key, month);
+    const rankedUsers = await User.find({ _id: { $in: wardTotals.map((row) => row._id) }, isActive: true })
+      .select('_id name').lean();
+    const pointsByUser = new Map(wardTotals.map((row) => [String(row._id), row.points]));
+    const ordered = rankedUsers.map((row) => ({ ...row, points: pointsByUser.get(String(row._id)) || 0 }))
+      .sort((left, right) => right.points - left.points
+        || String(left.name || '').localeCompare(String(right.name || ''))
+        || String(left._id).localeCompare(String(right._id)));
+    const index = ordered.findIndex((row) => String(row._id) === String(userId));
+    if (index >= 0) communityRank = index + 1;
+  }
   const [monthlyAhead, allTimeAhead] = await Promise.all([
     User.countDocuments({
       isActive: true,
@@ -367,6 +466,10 @@ export async function getMyGamificationStats(userIdValue) {
     resolved: resolved.length,
     drivesJoined,
     drivesOrganized,
+    streakWeeks: user.streakWeeks || 0,
+    lastReportWeek: user.lastReportWeek || null,
+    referralCode: user.referralCode || null,
+    community: communityLocation ? { ...communityLocation, rank: communityRank } : null,
     badges: user.badges || [],
     peopleImpactedEstimate: { value: resolved.length * IMPACT_ESTIMATE_PER_RESOLUTION, label: 'estimate' },
     beforeAfter: resolved.map((complaint) => ({
@@ -377,5 +480,7 @@ export async function getMyGamificationStats(userIdValue) {
     }))
   };
 }
+
+export const gamificationServiceInternals = { currentMonth, isoWeek, previousIsoWeek };
 
 export default { awardPoints, revokePoints, rebuildGamificationData, getLeaderboard, getMyGamificationStats };

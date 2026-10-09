@@ -42,7 +42,7 @@ async function notifyRecipients({ complaint, recipientIds, title, message, metad
 async function createInAppNotification(recipient, complaint, title, message, metadata) {
   const notification = await Notification.create({
     recipient,
-    complaint: complaint._id,
+    ...(complaint?._id ? { complaint: complaint._id } : {}),
     type: 'in_app',
     status: 'sent',
     title,
@@ -52,6 +52,26 @@ async function createInAppNotification(recipient, complaint, title, message, met
   });
   emitToUser(recipient, 'notification:new', notification.toObject());
   return notification;
+}
+
+export async function createSystemInAppNotification({ recipientId, title, message, metadata = {}, dedupeKey }) {
+  try {
+    const notification = await Notification.create({
+      recipient: recipientId,
+      type: 'in_app',
+      status: 'sent',
+      title,
+      message,
+      metadata,
+      ...(dedupeKey ? { dedupeKey } : {}),
+      sentAt: new Date()
+    });
+    emitToUser(recipientId, 'notification:new', notification.toObject());
+    return notification;
+  } catch (error) {
+    if (error?.code === 11000 && dedupeKey) return null;
+    throw error;
+  }
 }
 
 async function createEmailNotification(recipient, complaint, title, message, metadata) {

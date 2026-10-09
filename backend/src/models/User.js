@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { randomBytes } from 'node:crypto';
 import { COMPLAINT_CATEGORIES } from './Complaint.js';
 
 const userLocationSchema = new mongoose.Schema({
@@ -34,6 +35,10 @@ const userSchema = new mongoose.Schema(
     city: { type: String, trim: true, maxlength: 120 },
     availability: { type: String, enum: ['available', 'limited', 'unavailable', 'full_time', 'part_time', 'weekend', 'flexible'], default: 'available', index: true },
     location: { type: userLocationSchema, default: undefined },
+    referralCode: { type: String, unique: true, default: () => randomBytes(6).toString('hex').toUpperCase() },
+    referredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    streakWeeks: { type: Number, default: 0, min: 0 },
+    lastReportWeek: { type: String, match: /^\d{4}-W\d{2}$/ },
     totalPoints: { type: Number, default: 0, min: 0 },
     monthlyPoints: { type: Number, default: 0, min: 0 },
     monthlyPointsMonth: { type: String, match: /^\d{4}-\d{2}$/ },
@@ -46,6 +51,7 @@ const userSchema = new mongoose.Schema(
 userSchema.methods.toJSON = function toJSON() {
   const user = this.toObject();
   delete user.passwordHash;
+  delete user.referredBy;
   return user;
 };
 

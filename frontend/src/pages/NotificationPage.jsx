@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { getApiErrorMessage } from '../api/client.js';
 import { getNotifications } from '../api/notifications.js';
 import { useNotifications } from '../context/NotificationContext.jsx';
@@ -7,6 +8,7 @@ import useDebouncedValue from '../hooks/useDebouncedValue.js';
 import SkeletonList from '../components/layout/SkeletonList.jsx';
 import PageHeader from '../components/layout/PageHeader.jsx';
 import StreetEmptyIllustration from '../components/layout/StreetEmptyIllustration.jsx';
+import { notificationCopy } from '../utils/notificationDisplay.js';
 
 function notificationDate(value) {
   return new Date(value).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
@@ -25,6 +27,7 @@ function notificationIcon(notification) {
 }
 
 export default function NotificationPage() {
+  const { t, i18n } = useTranslation();
   const { notifications, notificationMeta, unreadCount, isLoading: contextLoading, error: contextError, markRead, refreshNotifications } = useNotifications();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -74,7 +77,7 @@ export default function NotificationPage() {
       const previousGroup = index ? notificationGroup(result.items[index - 1].createdAt) : '';
       return <div key={notification._id}>
         {group !== previousGroup && <h2 className="notification-group-heading">{group}</h2>}
-        <article className={`notification-page-item ${notification.status !== 'read' ? 'is-unread' : ''}`}><span className="notification-page-icon">{notificationIcon(notification)}</span><div className="notification-page-copy"><div><h2>{notification.title}</h2><time>{notificationDate(notification.createdAt)}</time></div><p>{notification.message}</p>{notification.complaint && <small>Complaint: {notification.complaint.title}</small>}</div>{notification.status !== 'read' && <button className="outline-button mark-read-button" onClick={() => handleMarkRead(notification._id)}>Mark as read</button>}</article>
+        <article className={`notification-page-item ${notification.status !== 'read' ? 'is-unread' : ''}`}><span className="notification-page-icon">{notificationIcon(notification)}</span><div className="notification-page-copy"><div><h2>{notificationCopy(notification, t, i18n.resolvedLanguage).title}</h2><time>{notificationDate(notification.createdAt)}</time></div><p>{notificationCopy(notification, t, i18n.resolvedLanguage).message}</p>{notification.complaint && <small>Complaint: {notification.complaint.title}</small>}</div>{notification.status !== 'read' && <button className="outline-button mark-read-button" onClick={() => handleMarkRead(notification._id)}>Mark as read</button>}</article>
       </div>;
     })}</section> : <div className="empty-state notification-empty"><StreetEmptyIllustration /><strong>All caught up</strong><p>There are no notifications to show.</p><Link className="outline-button" to="/dashboard/complaints">Browse complaints</Link></div>}
     {result.pages > 1 && <div className="pagination"><button disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>← Previous</button><span>Page {page} of {result.pages}</span><button disabled={page >= result.pages} onClick={() => setPage((current) => current + 1)}>Next →</button></div>}

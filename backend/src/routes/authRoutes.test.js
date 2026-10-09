@@ -5,6 +5,7 @@ import express from 'express';
 import User from '../models/User.js';
 import Complaint from '../models/Complaint.js';
 import RefreshSession from '../models/RefreshSession.js';
+import gamificationService from '../services/gamificationService.js';
 import authRoutes from './authRoutes.js';
 import { errorHandler } from '../middleware/errorHandler.js';
 import { requestContext } from '../middleware/requestContext.js';
@@ -20,17 +21,20 @@ async function postRegistration(t, body, createUser) {
       name: document.name,
       email: document.email,
       role: document.role,
+      referralCode: document.referralCode || 'ABCDEF123456',
       toJSON() {
         return {
           _id: USER_ID,
           name: this.name,
           email: this.email,
           role: this.role,
+          referralCode: this.referralCode,
           ...(document.location ? { location: document.location } : {})
         };
       }
     };
   });
+
   t.mock.method(RefreshSession, 'create', async () => ({}));
 
   const app = express();
@@ -59,6 +63,28 @@ const registration = (role, extra = {}) => ({
   password: 'strong-password-123',
   role,
   ...extra
+});
+
+test('registration accepts an optional normalized referral code', async (t) => {
+  const referrerId = '65f0c3123456789012345682';
+  t.mock.method(User, 'findOne', () => ({
+    select: () => ({ lean: async () => ({ _id: referrerId, email: 'referrer@example.test' }) })
+  }));
+  const award = t.mock.method(gamificationService, 'awardPoints', async () => true);
+  const { response, createdUsers } = await postRegistration(t, registration('citizen', { referralCode: ' abcd12 ' }));
+  assert.equal(response.status, 201);
+  assert.equal(createdUsers[0].referredBy, referrerId);
+  assert.deepEqual(award.mock.calls[0].arguments, [referrerId, 'referral_bonus', USER_ID]);
+});
+
+test('registration rejects unknown referral codes before creating an account', async (t) => {
+  t.mock.method(User, 'findOne', () => ({
+    select: () => ({ lean: async () => null })
+  }));
+  const { response, createdUsers } = await postRegistration(t, registration('citizen', { referralCode: 'NOTREAL123' }));
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, 'INVALID_REFERRAL_CODE');
+  assert.equal(createdUsers.length, 0);
 });
 
 test('citizen and volunteer registration succeeds without a location field', async (t) => {

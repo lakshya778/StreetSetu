@@ -322,6 +322,9 @@ The API is rooted at `/api/v1`. Protected routes require an access token except 
 | `GET` | `/api/v1/analytics/leaderboard` | Admin | Top volunteer weighted scores, ratings, response acceptance, and completion speed. |
 | `GET` | `/api/v1/leaderboard` | Authenticated | Top 20 community points with badge counts and current-user highlight; supports `scope=month\|all` and optional `ward`. |
 | `GET` | `/api/v1/users/me/stats` | Authenticated | Private current-user points, ranks, badges, civic impact estimate, and own resolved-report evidence. |
+| `GET` | `/api/v1/gamification/top3` | Authenticated | Latest closed monthly winners and current cleanest neighbourhood. |
+| `POST` | `/api/v1/admin/gamification/close-month?month=YYYY-MM` | Admin | Close a month once and issue winner badges, certificates, and in-app notifications. |
+| `GET` | `/api/v1/users/me/certificates` | Authenticated | List private winner certificates; each download is owner-authorized. |
 | `GET` | `/api/v1/complaints/:id` | Owner, assignee, or admin | Complaint details, history, and evidence. |
 | `POST` | `/api/v1/complaints/:id/feedback` | Reporting citizen, resolved complaint | Submit one 1–5 star rating and optional comment for the assigned volunteer. |
 | `PATCH` | `/api/v1/complaints/:id/status` | Volunteer or admin | Update an allowed lifecycle state; rejection requires a reason. |
@@ -359,6 +362,8 @@ The API is rooted at `/api/v1`. Protected routes require an access token except 
 For complete request/response details, see [`docs/api-design.md`](docs/api-design.md) and the backend route validators. The AI service separately exposes `GET /health`, `POST /v1/classify`, and the internal completion-verification endpoints to the API service.
 
 Rebuild gamification ledger totals and badges from existing complaint, drive, and support records with `npm run gamification:backfill`.
+
+Monthly award generation uses `MONTHLY_CLOSE_CRON` (default `5 0 1 * *`, Asia/Kolkata). Weekly streak reminders use `STREAK_REMINDER_CRON` (default `0 9 * * 1`, Asia/Kolkata) and are in-app only. `GAMIFICATION_CERTIFICATE_DIR` configures private certificate file storage; optionally set `GAMIFICATION_CERTIFICATE_FONT_PATH` to a local Unicode TTF for non-Latin names.
 
 ### Real-time events
 

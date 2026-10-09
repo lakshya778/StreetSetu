@@ -3,6 +3,8 @@ import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import User from '../models/User.js';
 import RefreshSession from '../models/RefreshSession.js';
 import { signToken, signRefreshToken, verifyRefreshToken } from '../config/jwt.js';
+import gamificationService from './gamificationService.js';
+import { ensureReferralCode } from './referralService.js';
 
 const PASSWORD_SALT_ROUNDS = 12;
 
@@ -28,6 +30,7 @@ function expiryDate() {
 }
 
 async function createSession(user, req) {
+  if (!user.referralCode) user.referralCode = await ensureReferralCode(user._id);
   const tokenId = randomUUID();
   const accessToken = signToken({ sub: String(user._id), email: user.email, role: user.role });
   const refreshToken = signRefreshToken({ sub: String(user._id) }, tokenId);
@@ -48,15 +51,33 @@ function completeLocation(location) {
   return { type: 'Point', coordinates };
 }
 
-export async function registerUser({ name, email, password, role = 'citizen', location }, req) {
+export async function registerUser({ name, email, password, role = 'citizen', location, referralCode }, req) {
   if (role === 'admin') throw new AuthError('Admin accounts must be provisioned by an administrator', 403, 'ROLE_NOT_ALLOWED');
   try {
+    const referrer = referralCode
+      ? await User.findOne({ referralCode: referralCode.toUpperCase(), isActive: true }).select('_id email').lean()
+      : null;
+    if (referralCode && !referrer) throw new AuthError('Referral code is invalid', 400, 'INVALID_REFERRAL_CODE');
+    if (referrer && referrer.email === email.toLowerCase()) {
+      throw new AuthError('You cannot refer your own account', 400, 'SELF_REFERRAL');
+    }
     const passwordHash = await bcrypt.hash(password, PASSWORD_SALT_ROUNDS);
     const userLocation = completeLocation(location);
-    const user = await User.create({ name, email, passwordHash, role, ...(userLocation ? { location: userLocation } : {}) });
+    const user = await User.create({
+      name,
+      email,
+      passwordHash,
+      role,
+      ...(userLocation ? { location: userLocation } : {}),
+      ...(referrer ? { referredBy: referrer._id } : {})
+    });
+    if (referrer) await gamificationService.awardPoints(referrer._id, 'referral_bonus', user._id);
     return await createSession(user, req);
   } catch (error) {
-    if (error?.code === 11000) throw new AuthError('An account with this email already exists', 409, 'EMAIL_ALREADY_EXISTS');
+    const duplicateEmail = error?.keyPattern?.email || error?.keyValue?.email || /email_1/.test(error?.message || '');
+    if (error?.code === 11000 && duplicateEmail) {
+      throw new AuthError('An account with this email already exists', 409, 'EMAIL_ALREADY_EXISTS');
+    }
     throw error;
   }
 }

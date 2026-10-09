@@ -28,6 +28,9 @@ export function validateRegister(req, res, next) {
 	const { details, email, password } = validateCommonCredentials(req.body);
 	const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
 	const role = req.body?.role || 'citizen';
+	const referralCode = typeof req.body?.referralCode === 'string'
+		? req.body.referralCode.trim().toUpperCase()
+		: '';
 	const requestedLocation = req.body?.location;
 	let location;
 
@@ -36,6 +39,9 @@ export function validateRegister(req, res, next) {
 	}
 	if (!REGISTERED_ROLES.has(role)) {
 		details.push({ field: 'role', message: 'Role must be citizen or volunteer' });
+	}
+	if (referralCode && !/^[A-Z0-9]{6,24}$/.test(referralCode)) {
+		details.push({ field: 'referralCode', message: 'Referral code must be 6 to 24 letters or numbers' });
 	}
 	if (requestedLocation !== undefined && requestedLocation !== null
 		&& (typeof requestedLocation !== 'object' || Array.isArray(requestedLocation))) {
@@ -61,7 +67,7 @@ export function validateRegister(req, res, next) {
 		return next(validationError(details));
 	}
 
-	req.body = { name, email, password, role, ...(location ? { location } : {}) };
+	req.body = { name, email, password, role, ...(location ? { location } : {}), ...(referralCode ? { referralCode } : {}) };
 	return next();
 }
 
