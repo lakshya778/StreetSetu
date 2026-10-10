@@ -1,446 +1,472 @@
-# StreetSetu – AI-Powered Street & Neighbourhood Action Platform
+# StreetSetu
 
-StreetSetu is a civic issue reporting and neighbourhood coordination platform. Citizens can submit location-aware complaints, administrators can review and assign work, and volunteers can track and document resolutions. The web application combines complaint workflows, maps, dashboards, notifications, and an AI-assisted classification service.
+**AI-Powered Civic Issue Reporting & Community Action**
 
-> **Project status:** This repository includes application code and deployment configuration. Hosting credentials, cloud resources, and public deployment URLs are environment-specific and are not included here.
+StreetSetu is a web platform for reporting local civic issues and coordinating
+community action. Citizens can submit location-aware complaints, follow their
+status, and support reports from their neighbourhood. Administrators review and
+assign work, while volunteers document their progress and completion evidence.
+The application also provides public transparency pages, operational analytics,
+and human-reviewed AI assistance.
 
-## Overview
+## Problem Statement
 
-StreetSetu makes local civic issues easier to report and follow through. It gives citizens a way to submit evidence and see progress, while administrators and volunteers get tools to review, route, work on, and measure complaints.
+Many civic reporting experiences lack:
 
-### Problem statement
+- Clear escalation when service deadlines pass.
+- Safeguards against complaints being marked resolved without review.
+- Help categorising and prioritising incoming reports.
+- Tools for neighbours to coordinate community action.
+- Transparent status history and public progress information.
+- Ongoing participation and recognition for community contributions.
 
-Civic issues are often reported across disconnected channels, with limited location context, unclear ownership, and little visibility into what happened next. StreetSetu provides a shared workflow that records issue details and evidence, tracks responsibility and status changes, and surfaces operational information to the people handling the work.
+## Key Features
 
-### Key features
+### Reporting
 
-- Role-based citizen, volunteer, and administrator experiences.
-- Complaint submission with category, priority, map coordinates, and image attachments.
-- Complaint lifecycle with a reasoned rejection path and recorded status history.
-- Admin assignment, reassignment, and ranked volunteer recommendations.
-- Volunteer work-start and completion evidence uploads.
-- Lightweight completion metadata checks with admin evidence review; visual similarity inference is disabled on small-instance deployments.
-- In-app notifications, optional email delivery, and Socket.IO updates.
-- Complaint maps, nearby issue lookup, and dashboard analytics.
-- Citizen nearby complaint discovery before submission with 500 m, 1 km, and 5 km search radii.
-- Volunteer daily route planning with greedy nearest-neighbour ordering, distance/time estimates, and a Leaflet route map.
-- Installable PWA with offline access to previously loaded dashboard, complaint, and notification data.
-- Public transparency metrics and shareable no-login complaint tracking links.
-- Citizen volunteer ratings after resolution, weighted volunteer leaderboard, and assignment accept/decline tracking.
-- Fullscreen before/after evidence viewer with keyboard navigation and zoom.
-- Audit activity, CSV export, and PDF reports for administrators.
-- AI-assisted complaint classification through a separate Python service.
+- Submit complaints with a title, description, category, priority, location, and
+  photo attachments. Location can use browser geolocation or a point selected
+  on the map.
+- Capture completion evidence with the live camera and include device location
+  and capture-time metadata when the browser makes it available.
+- Follow complaint status and receive in-app, real-time, and optionally email
+  notifications.
+- Report anonymously. Reporter identity is redacted in public and volunteer
+  views; the reporter and administrators can see it.
+- Check nearby reports for possible duplicates using category, text similarity,
+  and location. Administrators can review and merge duplicate complaints.
 
-## Features
+### AI-Assisted Triage
 
-- **Anonymous reporting:** Citizens can mark a complaint anonymous. Public and citizen-facing views show “Anonymous” instead of the reporter's identity; authorized staff and the reporting citizen retain access according to the existing API permissions.
-- **Automatic SLA escalation:** Complaint deadlines use `SLA_HIGH_MINUTES`, `SLA_MEDIUM_MINUTES`, and `SLA_LOW_MINUTES` (defaults: 1,440 / 2,880 / 4,320 minutes). The `ESCALATION_CRON` schedule defaults to once per minute. Public overdue complaints are available at `/overdue`; an administrator can trigger a run with `POST /api/v1/admin/escalation/run`.
-- **Hindi and English:** The web interface provides an EN / हिंदी switcher and saves the language preference in browser local storage.
-- **Volunteer drives:** Authenticated users can create drives and join or leave upcoming neighbourhood activities. The dashboard shows drive dates, locations, and participant counts.
-- **Waste segregation guide and recycling map:** Search local examples across five waste categories and view sample Delhi/NCR recycling-center markers on OpenStreetMap. The sample center coordinates are illustrative and must be locally verified.
+- A separate Python service uses TF-IDF features and Logistic Regression to
+  suggest a complaint category and priority from its title and description.
+- Suggestions include confidence and explanatory flags and are presented for
+  human review; the model does not classify images.
 
-### AI & Verification
+### Accountability and Transparency
 
-AI-assisted triage currently uses a lightweight TF-IDF/Logistic Regression text model to suggest complaint category and priority from the title and description; it does not perform YOLOv8 image classification. Suggestions are shown in the UI for human review. Completion evidence uses live-capture and available location/timestamp metadata checks. Visual before/after similarity is not enabled, so all completion evidence is routed to admin review (needs_review) before a complaint is marked resolved.
+- SLA deadlines are set by priority. High and critical complaints use the high
+  SLA setting; medium and low complaints use their respective settings.
+- A scheduled job escalates overdue complaints through Ward Officer, Zonal
+  Officer, and Commissioner levels. Each escalation is recorded in status
+  history and notifies the reporter and assignee where applicable.
+- The public overdue list and an administrator-only manual escalation trigger
+  are available.
+- Complaint status history and administrator audit logs provide an operational
+  record of changes.
+- Public pages provide aggregate transparency information and no-login complaint
+  status tracking.
 
-## Known Limitations / Roadmap
+### Assignment
 
-The following capabilities are **planned** and are not currently enabled:
+- Administrators can view volunteer recommendations ranked using distance,
+  active workload, resolution rate, and availability.
+- Administrators can auto-assign the highest-ranked available recommendation or
+  enter a volunteer ID for manual assignment or reassignment.
+- Volunteers can accept or decline assignments and update assigned work.
 
-- YOLOv8 image classification.
-- Perceptual-hash/CNN before-and-after image similarity.
-- Predictive hotspot mapping with DBSCAN.
-- Offline support.
-- Gamification certificates.
-- Mobile parity for newer features, including volunteer drives and the segregation guide.
+### Completion Evidence
 
-## Implemented capabilities
+- Volunteers add before-work images and submit completion proof through the live
+  camera workflow.
+- Available GPS and timestamp metadata are checked, but missing metadata may
+  leave a check inconclusive.
+- Visual before/after similarity is disabled. Completion evidence enters
+  `needs_review` for administrator review before resolution.
+- An administrator can approve or reject the evidence. Rejection returns the
+  complaint to `in_progress` and retains the rejected proof in evidence history.
 
-| Area | Current implementation |
+### Community
+
+- Authenticated users can create, join, and leave volunteer/community drives.
+- Users can vote to support complaints.
+
+### Gamification
+
+- Point events award 5 points for a report, 10 for an approved resolution, 15
+  for joining a drive, 25 for organizing a drive, 2 for each support vote
+  received, and 20 for a successful referral.
+- Badges are awarded for a first report, three resolved complaints, joining a
+  drive, organizing a drive, and reaching 100 or 500 total points.
+- The leaderboard supports monthly, all-time, and location-scoped rankings.
+- The My Impact view shows personal points, ranks, reports, resolved complaints,
+  drive participation, badges, a referral code, and a weekly reporting streak.
+  The people-impacted figure is an estimate of 25 people per resolved complaint.
+- A scheduled monthly close recognizes the top three point earners with badges,
+  in-app notifications, and downloadable PDF certificates. Weekly streak
+  reminders are in-app notifications.
+
+### Education and Inclusion
+
+- The searchable waste segregation guide groups examples into five waste
+  categories.
+- The recycling-centre map uses sample Delhi/NCR markers in the repository; the
+  locations and accepted materials should be verified before real-world use.
+- The web interface supports English and Hindi and saves the selected language
+  in browser storage.
+- The installable PWA caches the app shell and short-lived, read-only responses
+  for offline viewing. Offline complaint submission and synchronization are not
+  available.
+
+## Tech Stack
+
+| Area | Implementation |
 |---|---|
-| Authentication | Registration, login, logout, JWT access tokens, refresh-token flow, and role checks. |
-| Complaint management | Create, list, view, filter, search, map, vote, verify, and update complaints. |
-| Rejection workflow | Admin rejection from eligible review states with required reason, `rejectedAt`, `rejectedBy`, status history, and audit record. |
-| Volunteer assignment | Admin assignment/reassignment and volunteer assignment list/status updates. |
-| Smart recommendations | Top-five volunteer recommendations weighted by proximity (50%), active workload (25%), resolution rate (15%), and availability (10%). Admins can review, assign manually, or auto-assign the highest-ranked available volunteer. |
-| Work evidence and images | Cloudinary-backed image upload configuration; complaint images and work-start evidence remain file uploads. Completion proof is captured by the live camera with a device GPS/time watermark and stored with its capture metadata. |
-| Completion verification | Live camera device time, GPS distance and accuracy are checked before the existing verification flow; flagged proofs require admin review. |
-| Location support | GeoJSON point coordinates, Leaflet/OpenStreetMap maps, map complaint listing, and nearby complaint lookup. |
-| Notifications | In-app and reusable HTML/text SMTP email updates for submission, assignment, resolution, rejection, and volunteer assignment; Socket.IO sends live in-app updates. |
-| Real-time updates | Socket.IO with JWT authentication, user/role rooms, authorized complaint subscriptions, and complaint/dashboard update events. |
-| Dashboard analytics | Complaint totals, lifecycle and volunteer trends, plus admin geographic summaries, a filterable Leaflet heatmap, category/outcome hotspots, hotspot trends, heatmap score, and active hotspot count. |
-| Audit and activity | Actor, action, entity, previous/new values, request context, and timestamps are stored for auditable actions; administrators can query activity. |
-| Exports and reports | Admin CSV exports for complaints, volunteers, and analytics; PDF reports for monthly, executive admin, and individual volunteer performance. |
-| Public access | No-login city transparency portal and complaint status/timeline tracking pages. |
-| Citizen feedback | One 1–5 star rating per resolved complaint, optional comment, unique database constraint, and volunteer average rating. |
-| Volunteer performance | Admin leaderboard combines resolved volume (40%), citizen rating (30%), resolution speed (20%), and assignment acceptance (10%). Volunteers can accept or decline new assignments. |
-| Image viewer | Reusable responsive fullscreen image viewer with zoom, previous/next controls, and Escape close. |
-| Progressive web app | Installable app manifest, offline app shell, user-scoped protected API cache, and install prompt. |
-| AI classification | Optional Flask service predicts complaint category and priority and returns confidence, toxicity/spam flags, and explanatory reasons. Predictions are persisted as classification runs. |
+| Frontend | React, Vite, React Router, Axios |
+| Mobile | No mobile application is present in this repository |
+| Backend | Node.js 22, Express, Mongoose |
+| Database | MongoDB |
+| Authentication | JWT access and refresh tokens, bcryptjs password hashing |
+| Maps | Leaflet, React Leaflet, OpenStreetMap |
+| AI service | Python, Flask, scikit-learn, TF-IDF, Logistic Regression, joblib |
+| Media storage | Cloudinary |
+| Notifications | MongoDB-backed in-app notifications, Socket.IO, optional SMTP email |
+| Scheduling | node-cron |
+| Internationalization | i18next and react-i18next; English and Hindi |
+| Deployment and CI | Vercel, Render, Docker Compose, GitHub Actions |
 
-AI classification and volunteer recommendations are decision-support features. Administrators remain responsible for reviewing and accepting assignment recommendations.
+## Architecture
 
-## User roles
+The React web client calls the versioned Express API. The API enforces
+authentication and authorization, stores application records in MongoDB, sends
+images to Cloudinary, and calls the Python service for text classification and
+completion metadata checks. Socket.IO provides real-time updates. SLA and
+gamification cron jobs run in the API process.
 
-### Citizen
-
-- Register, sign in, report issues with location and images, and view their complaints.
-- Follow complaint status and notifications; vote on or verify complaints where the workflow allows.
-
-### Volunteer
-
-- View assigned complaints and update their work status.
-- Accept or decline assignments; see the average citizen rating on the volunteer dashboard.
-- Add work-start photos before moving a complaint into progress and submit completion proof through the live camera, with device location and capture time.
-- Maintain volunteer expertise and location details used by assignment recommendations.
-
-### Admin
-
-- Review complaints, change eligible statuses, reject with a reason, assign or reassign volunteers, and inspect recommendations.
-- Review top volunteer scores and ratings on the admin dashboard.
-- View operational analytics, rejection information, and activity logs; export CSV and PDF reports.
-
-## System architecture
-
-```mermaid
-flowchart LR
-  Citizen[Citizen / Volunteer / Admin] --> Web[React + Vite web app]
-  Web -->|REST /api/v1| API[Node.js + Express API]
-  Web <-->|Socket.IO| API
-  API --> DB[(MongoDB / Atlas)]
-  API --> Cloudinary[Cloudinary media storage]
-  API -->|classification request| AI[Python Flask AI service]
-  API --> Mail[SMTP email provider]
-  API --> Sentry[Sentry error monitoring]
+```text
+Citizens / Volunteers / Administrators
+                  |
+                  v
+          React + Vite web app
+             |          ^
+      REST   |          | Socket.IO
+             v          |
+          Express API --+
+          /     |       \
+         v      v        v
+    MongoDB  Cloudinary  Python Flask AI service
+         ^
+         |
+  API-process cron jobs
+  (SLA escalation and gamification)
 ```
 
-The Express API is the authority for authentication, role checks, complaint workflow, persistence, notifications, audit events, and real-time event publishing. MongoDB stores operational documents. The frontend is a single-page React application. The AI service is a separate HTTP service and can be left unconfigured when classification is not needed. Cloudinary, SMTP, and Sentry integrations require their own credentials.
-
-## Tech stack
-
-| Layer | Technologies |
-|---|---|
-| Web | React, Vite, React Router, Axios |
-| Maps and charts | Leaflet, React Leaflet, OpenStreetMap, Recharts |
-| API | Node.js (ES modules), Express, Mongoose |
-| Authentication and security | JWT, bcrypt, Helmet, CORS, rate limiting, cookie-parser |
-| Real time | Socket.IO and Socket.IO Client |
-| Media and reports | Cloudinary, Multer, PDFKit, CSV export |
-| Notifications and monitoring | MongoDB-backed in-app notifications, Nodemailer/SMTP, Sentry |
-| AI service | Python, Flask, pandas, scikit-learn, joblib |
-| Database | MongoDB (local or MongoDB Atlas) |
-| Delivery | Docker, Docker Compose, GitHub Actions, Render, Vercel |
-
-## Repository structure
+## Project Structure
 
 ```text
 StreetSetu/
 ├── backend/
-│   ├── src/
-│   │   ├── config/          # Environment, database, JWT and runtime configuration
-│   │   ├── controllers/     # HTTP request handlers
-│   │   ├── middleware/      # Authentication, authorization, upload and security middleware
-│   │   ├── models/          # Mongoose models
-│   │   ├── routes/          # Versioned API route modules
-│   │   ├── services/        # Complaint, assignment, analytics and integration logic
-│   │   └── validators/      # Request validation
-│   ├── .env.example
-│   └── Dockerfile
+│   ├── scripts/       # Demo seed, migration, and gamification backfill
+│   └── src/
+│       ├── config/    # Database and token configuration
+│       ├── controllers/
+│       ├── middleware/
+│       ├── models/    # Mongoose data models
+│       ├── routes/    # Express API route modules
+│       ├── services/  # Workflow, integrations, analytics, and jobs
+│       └── validators/
 ├── frontend/
-│   ├── src/
-│   │   ├── api/             # API clients
-│   │   ├── components/      # Reusable interface components
-│   │   ├── context/         # Application state and auth context
-│   │   └── pages/           # Route-level screens
-│   ├── .env.example
-│   ├── vercel.json
-│   └── Dockerfile
-├── ai-service/              # Optional Flask classification service and model assets
-├── docs/                    # Architecture, API, schema, maps and AI documentation
-├── .github/workflows/ci.yml # CI validation and optional deployment jobs
+│   ├── public/        # PWA manifest, service worker, static assets
+│   └── src/
+│       ├── api/       # API clients
+│       ├── components/
+│       ├── data/      # Guide, tips, and sample recycling-centre data
+│       ├── i18n/      # English and Hindi translations
+│       └── pages/
+├── ai-service/
+│   ├── tests/
+│   ├── utils/
+│   ├── dataset.csv
+│   ├── model.pkl
+│   └── vectorizer.pkl
+├── docs/              # API, architecture, schema, and release notes
 ├── docker-compose.yml
 ├── docker-compose.production.yml
-├── render.yaml
-└── README.md
+└── render.yaml
 ```
 
-## Requirements
+There is no `mobile/` application or mobile package in the current repository.
 
-- Node.js 22 or later and npm.
-- MongoDB locally or a MongoDB Atlas database.
-- Python 3.10+ and pip if running the AI service.
-- Cloudinary credentials for image uploads.
-- SMTP credentials only if outbound email notifications are needed.
+## Getting Started
 
-## Installation and local development
+### Prerequisites
 
-Clone the repository and install each application’s dependencies:
+- Node.js 22 and npm.
+- MongoDB locally or a reachable MongoDB deployment.
+- Python 3.10 or newer and pip to run the AI service or its tests.
+- Cloudinary credentials to enable image uploads.
+- SMTP credentials only if outbound email notifications are required.
+
+### Clone and Install
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/lakshya778/StreetSetu.git
 cd StreetSetu
 npm ci --prefix backend
 npm ci --prefix frontend
 ```
 
-Configure the API and web environment files:
+### Configure the Environment
 
-```bash
-cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env
+Copy the example files and edit the local copies. Do not commit `.env` files.
+
+```powershell
+Copy-Item backend/.env.example backend/.env
+Copy-Item frontend/.env.example frontend/.env
 ```
 
-On PowerShell, use `Copy-Item backend/.env.example backend/.env` and `Copy-Item frontend/.env.example frontend/.env` instead. Set `MONGO_URI` and replace both JWT secrets with independent, long random values. Configure Cloudinary if you plan to upload images. The frontend defaults target the local API at `http://localhost:5000`.
+| File | Variable names | Purpose |
+|---|---|---|
+| `backend/.env` | `PORT` | API listener port. |
+| `backend/.env` | `MONGO_URI` | MongoDB connection string. |
+| `backend/.env` | `JWT_SECRET`, `JWT_EXPIRES_IN`, `JWT_REFRESH_SECRET`, `JWT_REFRESH_EXPIRES_IN` | Access and refresh token secrets and lifetimes. |
+| `backend/.env` | `CLIENT_ORIGIN`, `CORS_ALLOWED_ORIGINS`, `TRUST_PROXY_HOPS` | Browser origin allowlist and reverse-proxy configuration. |
+| `backend/.env` | `API_RATE_LIMIT_WINDOW_MS`, `API_RATE_LIMIT_MAX` | General API rate limit window and maximum requests. |
+| `backend/.env` | `SENTRY_DSN`, `SENTRY_TRACES_SAMPLE_RATE` | Optional API error monitoring and trace sampling. |
+| `backend/.env` | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `CLOUDINARY_UPLOAD_FOLDER` | Cloudinary image storage credentials and destination folder. |
+| `backend/.env` | `UPLOAD_MAX_FILE_SIZE_BYTES`, `UPLOAD_MAX_FILES` | Upload size and count limits. |
+| `backend/.env` | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | Optional outbound email configuration. |
+| `backend/.env` | `PUBLIC_APP_URL` | Public frontend base URL used in notification links. |
+| `backend/.env` | `AI_SERVICE_URL`, `AI_SERVICE_TOKEN`, `AI_SERVICE_TIMEOUT_MS`, `AI_METADATA_TIMEOUT_MS`, `AI_VERIFICATION_TIMEOUT_MS` | AI service address, optional shared token, and request timeouts. |
+| `backend/.env` | `SLA_HIGH_MINUTES`, `SLA_MEDIUM_MINUTES`, `SLA_LOW_MINUTES`, `ESCALATION_CRON` | Complaint SLA durations and automatic escalation schedule. |
+| `backend/.env` | `MONTHLY_CLOSE_CRON`, `STREAK_REMINDER_CRON` | Monthly recognition and weekly streak-reminder schedules. |
+| `backend/.env` | `GAMIFICATION_CERTIFICATE_DIR`, `GAMIFICATION_CERTIFICATE_FONT_PATH` | Certificate output folder and optional font path. |
+| `backend/.env` | `DEMO_SEED_PASSWORD` | Optional password for locally seeded demo accounts. |
+| `frontend/.env` | `VITE_API_URL`, `VITE_SOCKET_URL` | Versioned API base URL and Socket.IO server origin. Vite variables are public and must not contain secrets. |
+| AI service process | `AI_SERVICE_TOKEN`, `PORT` | Optional request authentication shared with the backend and service listener port. The AI service defaults to port 5000. There is no AI-service `.env.example`. |
 
-Start MongoDB, then start the API and frontend in separate terminals:
+Use independent, strong JWT secrets outside local development. Set the same
+`AI_SERVICE_TOKEN` for the backend and AI service when token authentication is
+enabled. The backend example targets port 8000 for the AI service; set the AI
+service `PORT` to 8000 when running it alongside the API locally.
+
+### Run the Services
+
+Start MongoDB first. In separate terminals, start the API and web app:
 
 ```bash
-cd backend
 npm run dev
 ```
 
 ```bash
-cd frontend
-npm run dev
+npm run frontend
 ```
 
-The API health endpoint is `http://localhost:5000/api/health`; the API routes are under `/api/v1`. Vite prints the local frontend URL when it starts.
+The API listens on port 5000 by default, and Vite prints the web URL when it
+starts. The API has health routes at `/api/health` and `/api/v1/health`.
 
-## How to run the demo
+To run the optional AI service in a separate terminal from the repository root:
 
-1. Install dependencies and copy the backend and frontend environment examples as described above. Set `MONGO_URI` to a reachable MongoDB database, and replace the example JWT secrets. For seeded accounts, optionally set `DEMO_SEED_PASSWORD` in `backend/.env`; the example value is intended only for a local demo.
-2. Seed (or refresh) the demo accounts and records. The script is idempotent and leaves unrelated records alone; `--reset` removes only the accounts and records marked by this seed before recreating them:
-
-   ```powershell
-   cd backend
-   npm run seed
-   # Optional: remove only this script's demo data and recreate it
-   npm run seed -- --reset
-   ```
-
-   The seed prints the login emails and password when it finishes. Default local demo credentials:
-
-   | Role | Email |
-   |---|---|
-   | Admin | `admin@streetsetu.demo` |
-   | Citizen 1 | `citizen1@streetsetu.demo` |
-   | Citizen 2 | `citizen2@streetsetu.demo` |
-
-   Unless overridden with `DEMO_SEED_PASSWORD`, the demo password is `ChangeMe-Demo-2026!`. Do not use the demo password or demo accounts in a public or production deployment.
-3. Start the backend in one terminal (`cd backend; npm run dev`) and the web frontend in another (`cd frontend; npm run dev`). For classification, follow the optional AI-service setup below, then run `python app.py` from `ai-service`; set `AI_SERVICE_URL=http://127.0.0.1:8000` in `backend/.env`.
-4. Open the Vite URL, sign in with the admin or citizen credentials above, and visit complaints, Volunteer Drives, the Segregation Guide, or the public `/overdue` page. Seeded demo data includes ten complaints (mixed lifecycle states, two overdue escalations and two anonymous reports) and two future drives with participants.
-5. To demonstrate a newly expiring SLA, set `SLA_HIGH_MINUTES=1`, `SLA_MEDIUM_MINUTES=1`, `SLA_LOW_MINUTES=1`, and `ESCALATION_CRON=* * * * *` in `backend/.env`, then restart the backend and create a complaint. Wait at most one cron interval after its deadline or invoke `POST /api/v1/admin/escalation/run` with the admin access token. The overdue seeded complaints are already available for a quick public-page demo.
-
-### Optional AI service
-
-Install the Python dependencies and run the classifier from the repository root:
-
-```bash
+```powershell
+cd ai-service
 python -m venv .venv
-# macOS/Linux:
-source .venv/bin/activate
-# Windows PowerShell:
-# .venv\Scripts\Activate.ps1
-pip install -r ai-service/requirements.txt
-python ai-service/app.py
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+$env:PORT = "8000"
+python app.py
 ```
 
-The classifier listens on `127.0.0.1:8000` by default. Set `AI_SERVICE_URL=http://127.0.0.1:8000` in `backend/.env`. If `AI_SERVICE_TOKEN` is configured, use the same token in the backend and AI service environments.
+The service loads the checked-in `model.pkl` and `vectorizer.pkl`. Its starter
+training data is `dataset.csv`; run `python train_model.py` from `ai-service` to
+retrain and replace the local model artifacts.
 
-## Environment variables
+There is no mobile application to install or run.
 
-Copy the example files as above. Do not commit real secrets.
+### Seed Demo Data
 
-### Backend (`backend/.env`)
+Configure `backend/.env` and make sure MongoDB is available. Then run:
 
-| Variable | Purpose |
-|---|---|
-| `PORT` | API listener port; defaults to `5000` in the example. |
-| `MONGO_URI` | MongoDB connection string (local MongoDB or Atlas). |
-| `JWT_SECRET`, `JWT_EXPIRES_IN` | Access-token signing secret and lifetime. |
-| `JWT_REFRESH_SECRET`, `JWT_REFRESH_EXPIRES_IN` | Refresh-token signing secret and lifetime. Keep the secret separate from `JWT_SECRET`. |
-| `CLIENT_ORIGIN` | Primary frontend origin used for CORS/cookie configuration. |
-| `CORS_ALLOWED_ORIGINS` | Optional comma-separated additional allowed origins. |
-| `TRUST_PROXY_HOPS` | Trusted reverse-proxy hop count; configure for the deployed proxy. |
-| `API_RATE_LIMIT_WINDOW_MS`, `API_RATE_LIMIT_MAX` | General API rate-limit window and request limit. |
-| `SENTRY_DSN`, `SENTRY_TRACES_SAMPLE_RATE` | Optional API error monitoring and trace sampling. |
-| `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Cloudinary credentials for media storage. |
-| `CLOUDINARY_UPLOAD_FOLDER` | Cloudinary destination folder. |
-| `UPLOAD_MAX_FILE_SIZE_BYTES`, `UPLOAD_MAX_FILES` | Upload limits; example defaults are 5 MiB and five files. |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | Optional outbound email configuration. In-app notifications do not require SMTP. |
-| `PUBLIC_APP_URL` | Optional public frontend base URL used in complaint tracking email links. |
-| `AI_SERVICE_URL`, `AI_SERVICE_TOKEN`, `AI_SERVICE_TIMEOUT_MS` | Optional classifier endpoint, shared service token, and request timeout. |
-| `SLA_HIGH_MINUTES`, `SLA_MEDIUM_MINUTES`, `SLA_LOW_MINUTES` | Complaint SLA durations by priority; used to set deadlines and subsequent escalation deadlines. |
-| `ESCALATION_CRON` | Cron schedule for automatic SLA escalation; defaults to `* * * * *`. |
-| `DEMO_SEED_PASSWORD` | Optional password used for the local demo accounts created by `npm run seed`; use a local-only value. |
+```powershell
+cd backend
+npm run seed
+```
 
-### Frontend (`frontend/.env`)
+The seed is repeatable and manages one admin account, two citizen accounts, ten
+complaints, and two drives. It does not seed a volunteer account; create one
+through the registration flow by selecting the volunteer role. The script
+prints the demo account credentials when it finishes; use those locally and do
+not publish them.
 
-| Variable | Purpose |
-|---|---|
-| `VITE_API_URL` | API base URL; local example is `http://localhost:5000/api/v1`. |
-| `VITE_SOCKET_URL` | Socket.IO server origin; local example is `http://localhost:5000`. |
-| `VITE_SENTRY_DSN` | Optional frontend Sentry monitoring DSN. |
+To remove and recreate only the seed-managed accounts, demo-prefixed complaints,
+and demo-prefixed drives:
 
-Vite variables are bundled into the browser application and must never contain secrets.
+```powershell
+npm run seed -- --reset
+```
 
-## Docker
+The reset does not clear the entire database.
 
-The production Compose file runs the API and static frontend containers and expects an external MongoDB connection (commonly Atlas). Create a root `.env` for Compose with at least `MONGO_URI`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `CLIENT_ORIGIN`, `VITE_API_URL`, and `VITE_SOCKET_URL`. Supply Cloudinary/SMTP/Sentry/AI settings when those integrations are enabled.
+### Tests and Build
 
 ```bash
-docker compose -f docker-compose.production.yml up --build
+npm test
+npm run build
 ```
 
-The web container is exposed on port `8080` by default and the API on `5000`; `WEB_PORT` and `API_PORT` can override the host ports. Configure the browser API and Socket URLs to point to the reachable API origin. The separate `docker-compose.yml` includes auxiliary Postgres, Redis, and MinIO containers; the current application’s primary persistence and media integrations are MongoDB and Cloudinary.
+`npm test` runs the backend Node.js test suite. To run the AI service unit tests,
+from the `ai-service` directory:
 
-## API overview
+```bash
+python -m unittest discover -s tests
+```
 
-The API is rooted at `/api/v1`. Protected routes require an access token except for registration, login, refresh, logout, and health. Admin and volunteer operations are role-restricted. List endpoints accept pagination and applicable search/filter parameters; exact validation rules are in the route validators and API documentation.
+The frontend package currently defines a production build script but no
+frontend test script.
 
-| Method | Endpoint | Access | Purpose |
-|---|---|---|---|
-| `GET` | `/api/health` | Public | Service health check (outside `/api/v1`). |
-| `POST` | `/api/v1/auth/register` | Public | Create a citizen account. |
-| `POST` | `/api/v1/auth/login` | Public | Authenticate and receive tokens. |
-| `POST` | `/api/v1/auth/refresh` | Refresh token | Issue a new access token using refresh flow. |
-| `POST` | `/api/v1/auth/logout` | Authenticated | End the current refresh session. |
-| `GET` | `/api/v1/complaints/categories` | Authenticated | List supported categories. |
-| `POST` | `/api/v1/complaints` | Authenticated | Submit a complaint. |
-| `GET` | `/api/v1/complaints` | Authenticated | List visible complaints; supports filters, search, and pagination. |
-| `GET` | `/api/v1/complaints/map` | Authenticated | Complaint data for map views. |
-| `GET` | `/api/v1/complaints/nearby` | Citizen, volunteer, admin | Search public complaint locations by latitude, longitude, and radius in meters; includes support counts. |
-| `GET` | `/api/v1/public/transparency` | Public | City complaint totals, resolution time, categories, location summary, and active areas. |
-| `GET` | `/api/v1/public/complaints/:complaintId` | Public | Safe complaint status, volunteer name, and status timeline for tracking. |
-| `GET` | `/api/v1/analytics/heatmap` | Admin | Filterable complaint density points by category, status, and date range. |
-| `GET` | `/api/v1/analytics/overview` | Admin | Total, open, and resolved complaint totals plus resolution rate for dashboard KPIs. |
-| `GET` | `/api/v1/analytics/categories` | Admin | Complaint counts grouped by category for the analytics dashboard. |
-| `GET` | `/api/v1/analytics/areas` | Admin | Top 20 complaint areas by count for the analytics dashboard. |
-| `GET` | `/api/v1/analytics/resolution-trend` | Admin | Daily resolved complaint counts for the last 30 UTC calendar days. |
-| `GET` | `/api/v1/analytics/hotspots` | Admin | Top complaint zones, outcome hotspots, and monthly hotspot metrics. |
-| `GET` | `/api/v1/analytics/geo-summary` | Admin | Aggregated complaint counts by city, area, category, and status. |
-| `GET` | `/api/v1/analytics/leaderboard` | Admin | Top volunteer weighted scores, ratings, response acceptance, and completion speed. |
-| `GET` | `/api/v1/leaderboard` | Authenticated | Top 20 community points with badge counts and current-user highlight; supports `scope=month\|all` and optional `ward`. |
-| `GET` | `/api/v1/users/me/stats` | Authenticated | Private current-user points, ranks, badges, civic impact estimate, and own resolved-report evidence. |
-| `GET` | `/api/v1/gamification/top3` | Authenticated | Latest closed monthly winners and current cleanest neighbourhood. |
-| `POST` | `/api/v1/admin/gamification/close-month?month=YYYY-MM` | Admin | Close a month once and issue winner badges, certificates, and in-app notifications. |
-| `GET` | `/api/v1/users/me/certificates` | Authenticated | List private winner certificates; each download is owner-authorized. |
-| `GET` | `/api/v1/complaints/:id` | Owner, assignee, or admin | Complaint details, history, and evidence. |
-| `POST` | `/api/v1/complaints/:id/feedback` | Reporting citizen, resolved complaint | Submit one 1–5 star rating and optional comment for the assigned volunteer. |
-| `PATCH` | `/api/v1/complaints/:id/status` | Volunteer or admin | Update an allowed lifecycle state; rejection requires a reason. |
-| `POST` / `DELETE` | `/api/v1/complaints/:id/vote` | Authenticated | Add or remove a complaint vote. |
-| `POST` | `/api/v1/complaints/:id/verify` | Citizen | Verify a complaint resolution when eligible. |
-| `POST` | `/api/v1/assignments/:complaintId/assign` | Admin | Assign a volunteer. |
-| `GET` | `/api/v1/assignments/recommend/:complaintId` | Admin | Return the top five volunteers ranked by distance, workload, resolution rate, and availability. |
-| `GET` | `/api/v1/assignments/:complaintId/recommendations` | Admin | Retrieve ranked volunteer recommendations. |
-| `PUT` | `/api/v1/assignments/:complaintId/reassign` | Admin | Reassign an active complaint. |
-| `GET` | `/api/v1/assignments/my-assignments` | Volunteer | List the current volunteer’s assignments. |
-| `GET` | `/api/v1/assignments/my-route` | Volunteer | Get today’s active assignments in greedy nearest-neighbour visit order, estimated distance, and walking time. |
-| `PATCH` | `/api/v1/assignments/:complaintId/status` | Assigned volunteer | Advance assigned work status. |
-| `PATCH` | `/api/v1/assignments/:complaintId/response` | Assigned volunteer | Accept or decline a new assignment. |
-| `GET` | `/api/v1/dashboard/summary` | Authenticated | Dashboard metrics scoped to role and filters. |
-| `GET` | `/api/v1/dashboard/activity` | Admin | Query administrative audit activity. |
-| `GET` | `/api/v1/dashboard/export.csv` | Admin | Export dashboard complaint data as CSV. |
-| `GET` | `/api/v1/dashboard/export.pdf` | Admin | Generate a PDF report. |
-| `GET` | `/api/v1/dashboard/export/volunteers.csv` | Admin | Export volunteer profiles and performance. |
-| `GET` | `/api/v1/dashboard/export/analytics.csv` | Admin | Export dashboard metrics and trends. |
-| `GET` | `/api/v1/dashboard/export/monthly.pdf?month=YYYY-MM` | Admin | Generate a monthly summary report. |
-| `GET` | `/api/v1/dashboard/export/admin.pdf` | Admin | Generate an executive report with trends, duplicates, top volunteers, and zones. |
-| `GET` | `/api/v1/dashboard/export/volunteer.pdf?volunteerId=...` | Admin | Generate an individual volunteer report. |
-| `GET` | `/api/v1/notifications` | Authenticated | List the current user’s in-app notifications. |
-| `PATCH` | `/api/v1/notifications/:id/read` | Notification owner | Mark a notification as read. |
-| `POST` | `/api/v1/uploads/images` | Authenticated | Upload complaint images (`multipart/form-data`). |
-| `POST` | `/api/v1/uploads/complaints/:complaintId/before-images` | Authenticated, authorized workflow | Add work-start evidence. |
-| `POST` | `/api/v1/uploads/complaints/:complaintId/after-images` | Authenticated, authorized workflow | Add completion evidence. |
-| `GET` | `/api/v1/assignments/completion-verifications/:complaintId` | Assigned volunteer or admin | Read processing state and resume pending verification work. |
-| `GET` | `/api/v1/assignments/completion-verifications` | Admin | List verified, processing, and review-required completion evidence. |
-| `PATCH` | `/api/v1/assignments/completion-verifications/:complaintId` | Admin | Approve or reject the automated completion review. |
-| `PATCH` | `/api/v1/users/me/volunteer-profile` | Volunteer | Update volunteer contact, city/area, availability, expertise, and location. |
-| `GET` | `/api/v1/geo/complaints/nearby` | Authenticated | Legacy scoped nearby complaint lookup. |
-| `POST` | `/api/v1/ai/complaints/:id/classify` | Complaint-access user | Request AI classification for a complaint. |
+## Roles and Demo Guide
 
-For complete request/response details, see [`docs/api-design.md`](docs/api-design.md) and the backend route validators. The AI service separately exposes `GET /health`, `POST /v1/classify`, and the internal completion-verification endpoints to the API service.
+The implemented account roles are `citizen`, `volunteer`, and `admin`.
+Registration permits citizen and volunteer accounts; admin accounts are
+provisioned rather than self-registered. The seed creates an admin and two
+citizens, but no volunteer.
 
-Rebuild gamification ledger totals and badges from existing complaint, drive, and support records with `npm run gamification:backfill`.
+1. Configure the local services, seed the demo data, then register a volunteer
+   account and sign in with the seeded citizen account.
+2. Submit a complaint with a location and image. Request the AI triage suggestion
+   from the complaint workflow and review its suggested category and priority.
+3. Sign in as the admin. Review the complaint, inspect volunteer recommendations,
+   then use auto-assign or enter a volunteer ID to assign manually.
+4. For a quick local escalation demo, temporarily set
+   `SLA_HIGH_MINUTES`, `SLA_MEDIUM_MINUTES`, and `SLA_LOW_MINUTES` to `1`, and set
+   `ESCALATION_CRON` to `* * * * *`. Restart the API and create a new complaint.
+   After its deadline, wait for the next cron run or call
+   `POST /api/v1/admin/escalation/run` with an admin access token.
+5. Sign in as the assigned volunteer, accept the assignment, add before-work
+   evidence, move the work to in-progress, and submit completion proof through
+   live capture.
+6. The complaint enters `needs_review`. Sign in as admin and approve or reject
+   the evidence in the completion review queue. Approval resolves the complaint;
+   rejection returns it to `in_progress` and preserves the rejected evidence in
+   history.
+7. View awarded points and the leaderboard. Report submission awards 5 points;
+   an approved resolution awards 10 points to the reporter. These awards are
+   also reflected on the My Impact view.
 
-Monthly award generation uses `MONTHLY_CLOSE_CRON` (default `5 0 1 * *`, Asia/Kolkata). Weekly streak reminders use `STREAK_REMINDER_CRON` (default `0 9 * * 1`, Asia/Kolkata) and are in-app only. `GAMIFICATION_CERTIFICATE_DIR` configures private certificate file storage; optionally set `GAMIFICATION_CERTIFICATE_FONT_PATH` to a local Unicode TTF for non-Latin names.
+After the demo, restore the normal SLA values appropriate for your environment.
+The seed script prints credentials for its demo accounts; this README does not
+include passwords.
 
-### Real-time events
+## API Overview
 
-Socket.IO connections authenticate using the access token in the handshake `auth.token`. The server provides per-user and per-role rooms and checks access before joining complaint-specific rooms. Events include `notification:new`, `complaint:created`, `complaint:assigned`, `complaint:reassigned`, `complaint:status`, `complaint:rejected`, and `dashboard:updated`.
+Application routes are mounted under `/api/v1`. Access-controlled routes require
+an access token and enforce role or ownership checks. The separate
+`GET /api/health` route is outside the versioned API prefix.
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/health`, `/api/v1/health` | API health checks |
+| `POST` | `/api/v1/auth/register`, `/api/v1/auth/login`, `/api/v1/auth/refresh`, `/api/v1/auth/logout` | Registration and session lifecycle |
+| `GET`, `POST` | `/api/v1/complaints` | List and create complaints |
+| `GET` | `/api/v1/complaints/:id`, `/api/v1/complaints/map`, `/api/v1/complaints/nearby` | Complaint details and map/discovery data |
+| `POST` | `/api/v1/complaints/duplicates/check` | Find likely nearby duplicate reports |
+| `GET` | `/api/v1/complaints/overdue` | Public overdue complaint list |
+| `POST`, `DELETE` | `/api/v1/complaints/:id/vote` | Add or remove complaint support |
+| `POST` | `/api/v1/ai/complaints/:id/classify` | Request AI category and priority suggestions |
+| `GET` | `/api/v1/assignments/recommend/:complaintId` | Get top volunteer recommendations |
+| `GET` | `/api/v1/assignments/:complaintId/recommendations` | Get volunteer recommendations |
+| `POST` | `/api/v1/assignments/:complaintId/assign` | Assign a volunteer |
+| `PUT` | `/api/v1/assignments/:complaintId/reassign` | Reassign a volunteer |
+| `GET` | `/api/v1/assignments/my-assignments` | List the signed-in volunteer's assignments |
+| `PATCH` | `/api/v1/assignments/:complaintId/response`, `/api/v1/assignments/:complaintId/status` | Accept/decline an assignment or update work status |
+| `GET` | `/api/v1/assignments/completion-verifications`, `/api/v1/assignments/completion-verifications/:complaintId` | Load the completion-review queue or evidence details |
+| `PATCH` | `/api/v1/assignments/completion-verifications/:complaintId` | Approve or reject completion evidence |
+| `GET` | `/api/v1/drives`, `/api/v1/drives/:id` | Browse drives and view drive details |
+| `POST` | `/api/v1/drives`, `/api/v1/drives/:id/join`, `/api/v1/drives/:id/leave` | Create a drive or join/leave it |
+| `GET` | `/api/v1/leaderboard`, `/api/v1/gamification/top3`, `/api/v1/users/me/stats` | Community rankings, monthly winners, and personal impact |
+| `GET` | `/api/v1/public/transparency`, `/api/v1/public/complaints/:complaintId` | Public transparency summary and complaint tracking |
+| `GET` | `/api/v1/analytics/hotspots`, `/api/v1/analytics/heatmap` | Admin-only grid-based geographic analytics |
+| `POST` | `/api/v1/admin/escalation/run` | Admin-triggered SLA escalation run |
+| `GET`, `PATCH` | `/api/v1/notifications`, `/api/v1/notifications/:id/read` | List and mark in-app notifications |
+| `POST` | `/api/v1/uploads/images`, `/api/v1/uploads/complaints/:complaintId/before-images`, `/api/v1/uploads/complaints/:complaintId/after-images` | Upload complaint and work evidence images |
+
+The AI service separately exposes `GET /health`, `POST /v1/classify`,
+`POST /v1/image-metadata`, and `POST /v1/verify-completion` for service
+integration. The latter endpoints are not Express API routes. See
+[`docs/api-design.md`](docs/api-design.md) for additional API details.
 
 ## Deployment
 
-Deployment files are starting points; you must create the cloud resources, configure secrets, and set the correct public origins.
+The repository includes a Vercel configuration for the Vite frontend and a
+Render blueprint for the Express API and Python AI service.
 
-### MongoDB Atlas
+| Service | Deployment |
+|---|---|
+| Frontend | Deploy `frontend/` to Vercel. Set `VITE_API_URL` to `<your-api-url>/api/v1` and `VITE_SOCKET_URL` to the API origin. |
+| Backend | Deploy `backend/` to Render and configure MongoDB, JWT, allowed frontend origin, and any enabled integrations. The configured Render health check is `/api/health`. |
+| AI service | Deploy `ai-service/` to Render. Configure `AI_SERVICE_TOKEN` consistently with the backend. The configured health check is `/health`. |
 
-Create a MongoDB cluster and database user, allow the API host to connect through Atlas network access controls, then set the resulting connection string as `MONGO_URI` in the backend hosting environment. Keep credentials out of source control.
+Live URLs:
 
-### Render backend
+- Frontend: `<your-frontend-url>`
+- API: `<your-api-url>`
 
-The root `render.yaml` describes a Node web service rooted at `backend`, with `npm ci`, `npm start`, and `/api/health` health checks. Create/configure the Render service and set `MONGO_URI`, `CLIENT_ORIGIN`, and any integration secrets in Render’s environment settings. The blueprint sets `autoDeploy: false`; use a deploy hook or enable the deployment behavior you intend.
+Render's free tier sleeps when idle. A keep-alive ping to
+`<your-api-url>/api/v1/health` can help reduce idle periods, but does not
+guarantee continuous availability or change the free-tier sleep policy.
 
-### Vercel frontend
+## Privacy and Security
 
-The `frontend/vercel.json` configures a Vite build (`npm run build`, output `dist`) and SPA fallback. Set `VITE_API_URL`, `VITE_SOCKET_URL`, and optionally `VITE_SENTRY_DSN` in the Vercel project environment. These URLs must target the deployed backend and support the configured CORS and refresh-token behavior.
+- Passwords are hashed with bcryptjs. API access and refresh tokens use JWT;
+  refresh sessions are stored as hashes.
+- Role-based authorization and complaint ownership checks protect restricted
+  operations.
+- Anonymous reporter identity is redacted from public and volunteer views.
+- The API applies request validation, rate limits, security headers, and an
+  origin allowlist. Production requires separately configured JWT secrets and
+  explicit browser origins.
+- Keep `.env` files, service credentials, and deployment secrets out of Git.
+  Frontend `VITE_` variables are public build-time values, not a place for
+  secrets.
 
-### GitHub Actions CI/CD
+## AI & Verification
 
-`.github/workflows/ci.yml` runs backend tests and a frontend production build for pushes and pull requests targeting `main` and `develop`. On pushes to `main`, its deployment job can deploy Vercel and call a Render deploy hook when the following repository secrets are configured:
+AI-assisted triage currently uses a lightweight TF-IDF/Logistic Regression text model to suggest complaint category and priority from the title and description; it does not perform YOLOv8 image classification. Suggestions are shown in the UI for human review. Completion evidence uses live-capture and available location/timestamp metadata checks. Visual before/after similarity is not enabled, so all completion evidence is routed to admin review (needs_review) before a complaint is marked resolved.
 
-- `VERCEL_TOKEN`
-- `VERCEL_ORG_ID`
-- `VERCEL_PROJECT_ID`
-- `RENDER_DEPLOY_HOOK`
+## Known Limitations & Roadmap
 
-The deploy steps are conditional on those secrets being present. CI configuration does not itself provision Atlas, Render, or Vercel resources.
+The following are planned and are not implemented as described:
 
-## Screenshots
-
-Add current, sanitized screenshots to `docs/screenshots/` and replace these placeholders:
-
-<!-- ![Citizen complaint submission](docs/screenshots/citizen-complaint-submission.png) -->
-<!-- ![Admin operations dashboard](docs/screenshots/admin-dashboard.png) -->
-<!-- ![Volunteer assignments](docs/screenshots/volunteer-dashboard.png) -->
-<!-- ![Complaint location map](docs/screenshots/complaint-map.png) -->
-
-## Documentation
-
-- [Architecture](docs/architecture.md)
-- [API design](docs/api-design.md)
-- [MongoDB schemas](docs/mongodb-schemas.md)
-- [AI service architecture](docs/ai-service-architecture.md)
-- [AI complaint classification](docs/ai-complaint-classification-architecture.md)
-- [Maps and geolocation](docs/maps-geolocation-architecture.md)
-- [Production release notes](docs/production-release-v1.md)
-
-## Roadmap
-
-- Expand automated API integration and end-to-end coverage for citizen, admin, and volunteer workflows.
-- Add operational dashboards for service health, notification delivery, and background task outcomes.
-- Improve accessibility, localization, and mobile-first field workflows.
-- Add documented data retention and privacy controls for complaint media and audit records.
-- Evaluate a shared Socket.IO adapter and queue-backed notification delivery for horizontally scaled deployments.
-- Add container image validation and deployment smoke checks to CI/CD.
-- Publish stable hosted demo environments and sanitized screenshots when infrastructure is available.
+- YOLOv8 image classification for complaint photos.
+- Perceptual-hash or CNN-based before/after similarity checking and automatic
+  completion approval.
+- DBSCAN-based predictive hotspot mapping. The current heatmap and hotspot
+  analytics group complaint coordinates into rounded geographic grid cells; they
+  are not predictive clustering.
+- Full offline reporting and write synchronization. The web app has an installable
+  PWA shell and short-lived, read-only cached responses, but cannot submit
+  reports offline.
+- FCM push notifications. Current notifications are in-app, Socket.IO, and
+  optional SMTP email.
+- A dedicated mobile application.
+- Department and ward directories with department-level issue routing.
+- Asset registry, service-capacity, work-order, and dedicated inspection
+  management.
+- Community group management and broader ward action-planning workflows beyond
+  the existing volunteer drives.
+- Structured issue comments and formal reopen workflows.
+- Additional notification channels such as SMS and WhatsApp.
 
 ## Contributing
 
-Contributions are welcome. Before opening a pull request:
+Contributions should preserve the existing separation between frontend,
+backend, and AI service. Please include focused tests for behavior changes,
+update relevant documentation, and avoid committing secrets or generated
+credentials.
 
-1. Check existing issues and documentation, then create a focused branch from the current development branch.
-2. Keep changes consistent with the existing backend/frontend structure and role-based server authorization.
-3. Add or update relevant tests and API/data-model documentation when behavior or contracts change.
-4. Run the checks for affected apps:
+## Author
 
-   ```bash
-   npm test --prefix backend
-   npm run build --prefix frontend
-   ```
+- Name: `<Your name>`
+- Contact or profile: `<Your contact or profile>`
 
-5. Open a pull request with a concise description, verification results, and screenshots for UI changes. Never include `.env` files, credentials, or real citizen personal data.
+## Manual Verification Notes
 
-## License
-
-There is currently no `LICENSE` file in this repository. Until the maintainers add one, do not assume the project is licensed for reuse, redistribution, or contributions under open-source terms. Maintainers should select and add an explicit license before presenting this repository as an openly licensed project.
+- Recycling-centre records are sample data. Confirm their real locations and
+  accepted materials before relying on them.
+- Configure and verify the actual MongoDB, Cloudinary, SMTP, Render, and Vercel
+  settings for your deployment; this README contains no live credentials or
+  deployed URLs.
+- Completion metadata depends on browser permission and available device
+  metadata. Missing GPS or timestamps can produce inconclusive checks and still
+  require administrator review.
+- Register a volunteer account separately for the end-to-end demo; the seed
+  creates only admin and citizen users.
